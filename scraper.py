@@ -66,7 +66,11 @@ def send_telegram(token, chat_id, message):
 
 
 def format_notification(job, total_pm_count):
-    now_ist = datetime.now(IST).strftime("%d %b %Y, %I:%M %p IST")
+    updated_at = job.get("updated_at")
+    if updated_at:
+        posted_ist = datetime.fromisoformat(updated_at).astimezone(IST).strftime("%d %b %Y, %I:%M %p IST")
+    else:
+        posted_ist = datetime.now(IST).strftime("%d %b %Y, %I:%M %p IST")
     title = job["title"]
     location = build_location(job)
     apply_url = job.get("absolute_url", "https://boards.greenhouse.io/anthropic")
@@ -74,7 +78,7 @@ def format_notification(job, total_pm_count):
         f"🚨 New Anthropic PM Role\n\n"
         f"{title}\n"
         f"📍 {location}\n"
-        f"🕐 Posted: {now_ist}\n\n"
+        f"🕐 Posted: {posted_ist}\n\n"
         f"Apply → {apply_url}\n\n"
         f"Total PM roles open: {total_pm_count}"
     )
