@@ -17,7 +17,8 @@ ANTHROPIC_PM_TITLE_KEYWORDS = [
 ANTHROPIC_PM_DEPARTMENT = "product management"
 
 # --- Google Jobs (via jobspy) ---
-GOOGLE_SEARCH_TERM = "product manager at Google India"
+GOOGLE_SEARCH_TERM = "product manager"
+GOOGLE_LOCATION = "India"
 GOOGLE_RESULTS_WANTED = 50
 GOOGLE_PM_KEYWORDS = [
     "product manager", "product management", "product lead",
@@ -138,7 +139,8 @@ def get_google_pm_jobs():
     try:
         df = scrape_jobs(
             site_name=["google"],
-            google_search_term=GOOGLE_SEARCH_TERM,
+            search_term=GOOGLE_SEARCH_TERM,
+            location=GOOGLE_LOCATION,
             results_wanted=GOOGLE_RESULTS_WANTED,
             verbose=0,
         )
@@ -146,28 +148,33 @@ def get_google_pm_jobs():
         raise RuntimeError(f"jobspy scrape_jobs failed: {e}") from e
 
     if df is None or df.empty:
-        return []
+        raise RuntimeError(
+            "jobspy returned 0 raw results — likely bot detection on GitHub Actions IP"
+        )
+
+    unique_companies = df["company"].dropna().unique().tolist()[:10]
+    print(f"  [debug] {len(df)} raw results; sample companies: {unique_companies}")
 
     jobs = []
     for _, row in df.iterrows():
-        company = row.get("company") or ""
+        company = str(row.get("company") or "").strip()
         if "google" not in company.lower():
             continue
 
-        title = row.get("title") or ""
+        title = str(row.get("title") or "").strip()
         if not any(kw in title.lower() for kw in GOOGLE_PM_KEYWORDS):
             continue
 
-        raw_id = row.get("id") or ""
+        raw_id = str(row.get("id") or "")
         job_id = raw_id.replace("go-", "", 1) if raw_id.startswith("go-") else raw_id
         stable_id = f"google_{job_id}" if job_id else None
         if not stable_id:
             continue
 
         date_posted = row.get("date_posted")
-        updated_at = date_posted.isoformat() if date_posted else None
-        location = row.get("location") or "India"
-        apply_url = row.get("job_url") or "https://careers.google.com"
+        updated_at = date_posted.isoformat() if (date_posted and hasattr(date_posted, "isoformat")) else None
+        location = str(row.get("location") or "India").strip()
+        apply_url = str(row.get("job_url") or "https://careers.google.com").strip()
 
         jobs.append({
             "id": stable_id,
@@ -178,6 +185,7 @@ def get_google_pm_jobs():
             "updated_at": updated_at,
         })
 
+    print(f"  [debug] {len(jobs)} jobs passed Google + PM filter")
     return jobs
 
 
