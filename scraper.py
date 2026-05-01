@@ -19,6 +19,10 @@ GREENHOUSE_COMPANIES = [
         "pm_title_keywords": ["product manager", "product management", "product lead", "research product"],
         "pm_department_keyword": "product management",
     },
+]
+
+# --- Ashby job boards ---
+ASHBY_COMPANIES = [
     {
         "name": "OpenAI",
         "slug": "openai",
@@ -28,7 +32,7 @@ GREENHOUSE_COMPANIES = [
     },
     {
         "name": "Perplexity",
-        "slug": "perplexityai",
+        "slug": "perplexity",
         "id_prefix": "perplexity",
         "pm_title_keywords": ["product manager", "product management", "product lead"],
         "pm_department_keyword": "product",
@@ -184,6 +188,47 @@ def get_greenhouse_pm_jobs(company):
     return pm_jobs
 
 
+# ── Ashby (generic) ──────────────────────────────────────────────────────────────────────
+
+def get_ashby_pm_jobs(company):
+    slug = company["slug"]
+    url = f"https://api.ashbyhq.com/posting-api/job-board/{slug}"
+    t0 = time.time()
+    log(f"  Fetching from Ashby API: {url}")
+    data = fetch_json(url)
+    all_jobs = [j for j in data.get("jobs", []) if j.get("isListed", True)]
+    log(f"  API response: {len(all_jobs)} listed jobs ({time.time()-t0:.1f}s)")
+
+    pm_title_kws = company["pm_title_keywords"]
+    pm_dept_kw = company["pm_department_keyword"]
+
+    pm_jobs = []
+    for job in all_jobs:
+        title = job.get("title", "").lower()
+        is_pm = any(kw in title for kw in pm_title_kws)
+        if not is_pm:
+            team_name = (job.get("team") or {}).get("name", "").lower()
+            if pm_dept_kw in team_name:
+                is_pm = True
+        if not is_pm:
+            continue
+
+        location = (job.get("location") or {}).get("name") or "Remote / Not specified"
+        pm_jobs.append({
+            "id": f"{company['id_prefix']}_{job['id']}",
+            "company": company["name"],
+            "title": job.get("title"),
+            "location": location,
+            "apply_url": job.get("applyUrl", f"https://jobs.ashbyhq.com/{slug}"),
+            "updated_at": job.get("publishedAt"),
+        })
+
+    log(f"  After PM filter: {len(pm_jobs)} role(s)")
+    for job in pm_jobs:
+        log(f"    - {job['title']} | {job['location']}")
+    return pm_jobs
+
+
 # ── Google ───────────────────────────────────────────────────────────────────────────────
 
 def get_google_pm_jobs():
@@ -323,13 +368,28 @@ def main():
 
     total_new = 0
 
-    # Greenhouse companies (Anthropic, OpenAI, Perplexity)
+    # Greenhouse companies (Anthropic)
     for company in GREENHOUSE_COMPANIES:
         name = company["name"]
         log(f"[{name}] Checking PM roles...")
         t0 = time.time()
         try:
             jobs = get_greenhouse_pm_jobs(company)
+            log(f"[{name}] {len(jobs)} PM role(s) found ({time.time()-t0:.1f}s)")
+            new = process_company(jobs, known, token, chat_id)
+            total_new += len(new)
+        except Exception as e:
+            log(f"[{name}] ERROR: {e}")
+            send_error_alert(token, chat_id, name, e)
+        log("-" * 60)
+
+    # Ashby companies (OpenAI, Perplexity)
+    for company in ASHBY_COMPANIES:
+        name = company["name"]
+        log(f"[{name}] Checking PM roles...")
+        t0 = time.time()
+        try:
+            jobs = get_ashby_pm_jobs(company)
             log(f"[{name}] {len(jobs)} PM role(s) found ({time.time()-t0:.1f}s)")
             new = process_company(jobs, known, token, chat_id)
             total_new += len(new)
