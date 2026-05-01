@@ -16,7 +16,9 @@ ANTHROPIC_PM_TITLE_KEYWORDS = [
 ]
 ANTHROPIC_PM_DEPARTMENT = "product management"
 
-# --- Google Jobs (via jobspy) ---
+# --- Google Jobs (via LinkedIn) ---
+# Google's own search blocks GitHub Actions (Azure) IPs via bot detection.
+# LinkedIn indexes Google's postings and is reliably accessible from cloud runners.
 GOOGLE_SEARCH_TERM = "product manager"
 GOOGLE_LOCATION = "India"
 GOOGLE_RESULTS_WANTED = 50
@@ -138,18 +140,18 @@ def get_anthropic_pm_jobs():
 def get_google_pm_jobs():
     try:
         df = scrape_jobs(
-            site_name=["google"],
+            site_name=["linkedin"],
             search_term=GOOGLE_SEARCH_TERM,
             location=GOOGLE_LOCATION,
             results_wanted=GOOGLE_RESULTS_WANTED,
             verbose=0,
         )
     except Exception as e:
-        raise RuntimeError(f"jobspy scrape_jobs failed: {e}") from e
+        raise RuntimeError(f"jobspy LinkedIn scrape failed: {e}") from e
 
     if df is None or df.empty:
         raise RuntimeError(
-            "jobspy returned 0 raw results — likely bot detection on GitHub Actions IP"
+            "jobspy returned 0 raw results from LinkedIn — possible rate-limit or API change"
         )
 
     unique_companies = df["company"].dropna().unique().tolist()[:10]
@@ -166,8 +168,7 @@ def get_google_pm_jobs():
             continue
 
         raw_id = str(row.get("id") or "")
-        job_id = raw_id.replace("go-", "", 1) if raw_id.startswith("go-") else raw_id
-        stable_id = f"google_{job_id}" if job_id else None
+        stable_id = f"google_{raw_id}" if raw_id else None
         if not stable_id:
             continue
 
