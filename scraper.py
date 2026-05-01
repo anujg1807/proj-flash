@@ -190,30 +190,45 @@ def get_greenhouse_pm_jobs(company):
 
 # ── Ashby (generic) ──────────────────────────────────────────────────────────────────────
 
+def _ashby_field(val):
+    """Ashby returns some fields as plain strings OR {"name": "..."} dicts."""
+    if isinstance(val, dict):
+        return val.get("name") or ""
+    return val or ""
+
+
 def get_ashby_pm_jobs(company):
     slug = company["slug"]
     url = f"https://api.ashbyhq.com/posting-api/job-board/{slug}"
     t0 = time.time()
     log(f"  Fetching from Ashby API: {url}")
     data = fetch_json(url)
-    all_jobs = [j for j in data.get("jobs", []) if j.get("isListed", True)]
+
+    raw_jobs = data.get("jobs") or data.get("jobPostings") or []
+    if isinstance(raw_jobs, dict):
+        raw_jobs = list(raw_jobs.values())
+    all_jobs = [j for j in raw_jobs if isinstance(j, dict) and j.get("isListed", True)]
     log(f"  API response: {len(all_jobs)} listed jobs ({time.time()-t0:.1f}s)")
+
+    if os.environ.get("DEBUG") and all_jobs:
+        log(f"  DEBUG first job keys: {list(all_jobs[0].keys())}")
+        log(f"  DEBUG location={repr(all_jobs[0].get('location'))} team={repr(all_jobs[0].get('team'))}")
 
     pm_title_kws = company["pm_title_keywords"]
     pm_dept_kw = company["pm_department_keyword"]
 
     pm_jobs = []
     for job in all_jobs:
-        title = job.get("title", "").lower()
+        title = (job.get("title") or "").lower()
         is_pm = any(kw in title for kw in pm_title_kws)
         if not is_pm:
-            team_name = (job.get("team") or {}).get("name", "").lower()
+            team_name = _ashby_field(job.get("team")).lower()
             if pm_dept_kw in team_name:
                 is_pm = True
         if not is_pm:
             continue
 
-        location = (job.get("location") or {}).get("name") or "Remote / Not specified"
+        location = _ashby_field(job.get("location")) or "Remote / Not specified"
         pm_jobs.append({
             "id": f"{company['id_prefix']}_{job['id']}",
             "company": company["name"],
