@@ -28,14 +28,14 @@ ASHBY_COMPANIES = [
         "slug": "openai",
         "id_prefix": "openai",
         "pm_title_keywords": ["product manager", "product management", "product lead"],
-        "pm_department_keyword": "product",
+        "pm_department_keyword": None,
     },
     {
         "name": "Perplexity",
         "slug": "perplexity",
         "id_prefix": "perplexity",
         "pm_title_keywords": ["product manager", "product management", "product lead"],
-        "pm_department_keyword": "product",
+        "pm_department_keyword": None,
     },
 ]
 
@@ -221,7 +221,7 @@ def get_ashby_pm_jobs(company):
     for job in all_jobs:
         title = (job.get("title") or "").lower()
         is_pm = any(kw in title for kw in pm_title_kws)
-        if not is_pm:
+        if not is_pm and pm_dept_kw:
             team_name = _ashby_field(job.get("team")).lower()
             if pm_dept_kw in team_name:
                 is_pm = True
