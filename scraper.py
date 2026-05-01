@@ -19,7 +19,8 @@ ANTHROPIC_PM_DEPARTMENT = "product management"
 
 # --- Google Jobs (via LinkedIn) ---
 # Google's own search blocks GitHub Actions (Azure) IPs via bot detection.
-# LinkedIn indexes Google's postings and is reliably accessible from cloud runners.
+# Using LinkedIn with Google's company ID (1441) fetches only Google postings directly.
+GOOGLE_LINKEDIN_COMPANY_ID = 1441
 GOOGLE_SEARCH_TERM = "product manager"
 GOOGLE_LOCATION = "India"
 GOOGLE_RESULTS_WANTED = 50
@@ -157,13 +158,14 @@ def get_anthropic_pm_jobs():
 
 def get_google_pm_jobs():
     t0 = time.time()
-    log(f"  Source: LinkedIn | search_term='{GOOGLE_SEARCH_TERM}' | location='{GOOGLE_LOCATION}' | results_wanted={GOOGLE_RESULTS_WANTED}")
+    log(f"  Source: LinkedIn company_id={GOOGLE_LINKEDIN_COMPANY_ID} | search_term='{GOOGLE_SEARCH_TERM}' | location='{GOOGLE_LOCATION}'")
 
     try:
         df = scrape_jobs(
             site_name=["linkedin"],
             search_term=GOOGLE_SEARCH_TERM,
             location=GOOGLE_LOCATION,
+            linkedin_company_ids=[GOOGLE_LINKEDIN_COMPANY_ID],
             results_wanted=GOOGLE_RESULTS_WANTED,
             verbose=0,
         )
@@ -176,26 +178,16 @@ def get_google_pm_jobs():
             f"jobspy returned 0 raw results from LinkedIn after {elapsed:.1f}s — possible rate-limit or API change"
         )
 
-    log(f"  Raw results: {len(df)} rows fetched in {elapsed:.1f}s")
-
-    # Company breakdown
-    company_counts = df["company"].fillna("(unknown)").value_counts()
-    log(f"  Company breakdown (top 10):")
-    for company, count in company_counts.head(10).items():
-        log(f"    {count:3d}  {company}")
-
-    # Filter step 1: company = Google
-    google_rows = df[df["company"].str.contains("google", case=False, na=False)]
-    log(f"  After company='Google' filter: {len(google_rows)} row(s)")
-    for _, row in google_rows.iterrows():
+    log(f"  Raw results: {len(df)} Google job(s) fetched in {elapsed:.1f}s")
+    for _, row in df.iterrows():
         log(f"    title='{row.get('title')}' | location='{row.get('location')}' | posted={row.get('date_posted')}")
 
-    # Filter step 2: PM keywords
+    # Filter to PM titles only
     jobs = []
-    for _, row in google_rows.iterrows():
+    for _, row in df.iterrows():
         title = str(row.get("title") or "").strip()
         if not any(kw in title.lower() for kw in GOOGLE_PM_KEYWORDS):
-            log(f"    SKIP (title not PM): '{title}'")
+            log(f"    SKIP (not PM title): '{title}'")
             continue
 
         raw_id = str(row.get("id") or "")
