@@ -111,6 +111,18 @@ def format_notification(job, total_count):
     )
 
 
+def format_repost_notification(job, total_count):
+    posted = format_posted_date(job.get("updated_at"))
+    return (
+        f"🔄 Reposted {job['company']} PM Role\n\n"
+        f"{job['title']}\n"
+        f"📍 {job['location']}\n"
+        f"🕐 Reposted: {posted}\n\n"
+        f"Apply → {job['apply_url']}\n\n"
+        f"Total {job['company']} PM roles open: {total_count}"
+    )
+
+
 # ── Anthropic ─────────────────────────────────────────────────────────────────────────────
 
 def fetch_anthropic_jobs():
@@ -217,18 +229,34 @@ def get_google_pm_jobs():
 # ── Main ───────────────────────────────────────────────────────────────────────────────
 
 def process_company(jobs, known, token, chat_id):
-    new_jobs = [j for j in jobs if j["id"] not in known]
-    already_known = len(jobs) - len(new_jobs)
-    log(f"  {already_known} already known, {len(new_jobs)} new")
     now_iso = datetime.now(timezone.utc).isoformat()
+    new_jobs = []
+    reposted_jobs = []
 
-    for job in new_jobs:
-        known[job["id"]] = {
-            "title": job["title"],
-            "location": job["location"],
-            "apply_url": job["apply_url"],
-            "first_seen": now_iso,
-        }
+    for job in jobs:
+        job_id = job["id"]
+        current_date = job.get("updated_at")
+
+        if job_id not in known:
+            known[job_id] = {
+                "title": job["title"],
+                "location": job["location"],
+                "apply_url": job["apply_url"],
+                "first_seen": now_iso,
+                "date_posted": current_date,
+            }
+            new_jobs.append(job)
+        else:
+            stored_date = known[job_id].get("date_posted")
+            if current_date and stored_date and current_date > stored_date:
+                log(f"  REPOST detected: '{job['title']}' ({stored_date} → {current_date})")
+                known[job_id]["date_posted"] = current_date
+                reposted_jobs.append(job)
+            elif current_date and not stored_date:
+                known[job_id]["date_posted"] = current_date
+
+    already_known = len(jobs) - len(new_jobs) - len(reposted_jobs)
+    log(f"  {already_known} already known, {len(new_jobs)} new, {len(reposted_jobs)} reposted")
 
     if new_jobs:
         for job in new_jobs:
@@ -237,8 +265,7 @@ def process_company(jobs, known, token, chat_id):
         if token and chat_id:
             for job in new_jobs:
                 try:
-                    msg = format_notification(job, len(jobs))
-                    send_telegram(token, chat_id, msg)
+                    send_telegram(token, chat_id, format_notification(job, len(jobs)))
                     log(f"  Telegram alert sent: '{job['title']}'")
                 except Exception as e:
                     log(f"  Telegram alert FAILED for '{job['title']}': {e}")
@@ -246,6 +273,19 @@ def process_company(jobs, known, token, chat_id):
             log("  Telegram creds not set — skipping notifications.")
     else:
         log("  No new roles.")
+
+    if reposted_jobs:
+        if token and chat_id:
+            for job in reposted_jobs:
+                try:
+                    send_telegram(token, chat_id, format_repost_notification(job, len(jobs)))
+                    log(f"  Repost alert sent: '{job['title']}'")
+                except Exception as e:
+                    log(f"  Repost alert FAILED for '{job['title']}': {e}")
+        else:
+            log("  Telegram creds not set — skipping repost notifications.")
+    else:
+        log("  No reposts detected.")
 
     return new_jobs
 
