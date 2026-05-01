@@ -96,7 +96,7 @@ def format_posted_date(updated_at):
             return dt.astimezone(IST).strftime("%d %b %Y, %I:%M %p IST")
         except Exception:
             pass
-    return datetime.now(IST).strftime("%d %b %Y, %I:%M %p IST")
+    return "Date not available"
 
 
 def format_notification(job, total_count):
