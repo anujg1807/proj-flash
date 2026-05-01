@@ -10,12 +10,30 @@ from jobspy import scrape_jobs
 STATE_FILE = Path(__file__).parent / "known_jobs.json"
 IST = timezone(timedelta(hours=5, minutes=30))
 
-# --- Anthropic (Greenhouse) ---
-ANTHROPIC_URL = "https://boards-api.greenhouse.io/v1/boards/anthropic/jobs"
-ANTHROPIC_PM_TITLE_KEYWORDS = [
-    "product manager", "product management", "product lead", "research product"
+# --- Greenhouse job boards ---
+GREENHOUSE_COMPANIES = [
+    {
+        "name": "Anthropic",
+        "slug": "anthropic",
+        "id_prefix": "anthropic",
+        "pm_title_keywords": ["product manager", "product management", "product lead", "research product"],
+        "pm_department_keyword": "product management",
+    },
+    {
+        "name": "OpenAI",
+        "slug": "openai",
+        "id_prefix": "openai",
+        "pm_title_keywords": ["product manager", "product management", "product lead"],
+        "pm_department_keyword": "product",
+    },
+    {
+        "name": "Perplexity",
+        "slug": "perplexityai",
+        "id_prefix": "perplexity",
+        "pm_title_keywords": ["product manager", "product management", "product lead"],
+        "pm_department_keyword": "product",
+    },
 ]
-ANTHROPIC_PM_DEPARTMENT = "product management"
 
 # --- Google Jobs (via LinkedIn) ---
 # Google's own search blocks GitHub Actions (Azure) IPs via bot detection.
@@ -123,46 +141,46 @@ def format_repost_notification(job, total_count):
     )
 
 
-# ── Anthropic ─────────────────────────────────────────────────────────────────────────────
+# ── Greenhouse (generic) ──────────────────────────────────────────────────────────────────
 
-def fetch_anthropic_jobs():
-    data = fetch_json(ANTHROPIC_URL)
-    return data.get("jobs", [])
-
-
-def is_anthropic_pm(job):
-    title = job.get("title", "").lower()
-    if any(kw in title for kw in ANTHROPIC_PM_TITLE_KEYWORDS):
-        return True
-    for dept in job.get("departments", []):
-        if ANTHROPIC_PM_DEPARTMENT in dept.get("name", "").lower():
-            return True
-    return False
-
-
-def normalize_anthropic(job):
-    offices = job.get("offices", [])
-    location = ", ".join(o["name"] for o in offices if o.get("name")) or "Remote / Not specified"
-    return {
-        "id": f"anthropic_{job['id']}",
-        "company": "Anthropic",
-        "title": job.get("title"),
-        "location": location,
-        "apply_url": job.get("absolute_url", "https://boards.greenhouse.io/anthropic"),
-        "updated_at": job.get("updated_at"),
-    }
-
-
-def get_anthropic_pm_jobs():
+def get_greenhouse_pm_jobs(company):
+    slug = company["slug"]
+    url = f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs"
     t0 = time.time()
-    log(f"  Fetching from Greenhouse API: {ANTHROPIC_URL}")
-    all_jobs = fetch_anthropic_jobs()
-    log(f"  API response: {len(all_jobs)} total jobs across all departments ({time.time()-t0:.1f}s)")
+    log(f"  Fetching from Greenhouse API: {url}")
+    data = fetch_json(url)
+    all_jobs = data.get("jobs", [])
+    log(f"  API response: {len(all_jobs)} total jobs ({time.time()-t0:.1f}s)")
 
-    pm_jobs = [normalize_anthropic(j) for j in all_jobs if is_anthropic_pm(j)]
+    pm_title_kws = company["pm_title_keywords"]
+    pm_dept_kw = company["pm_department_keyword"]
+
+    pm_jobs = []
+    for job in all_jobs:
+        title = job.get("title", "").lower()
+        is_pm = any(kw in title for kw in pm_title_kws)
+        if not is_pm:
+            for dept in job.get("departments", []):
+                if pm_dept_kw in dept.get("name", "").lower():
+                    is_pm = True
+                    break
+        if not is_pm:
+            continue
+
+        offices = job.get("offices", [])
+        location = ", ".join(o["name"] for o in offices if o.get("name")) or "Remote / Not specified"
+        pm_jobs.append({
+            "id": f"{company['id_prefix']}_{job['id']}",
+            "company": company["name"],
+            "title": job.get("title"),
+            "location": location,
+            "apply_url": job.get("absolute_url", f"https://boards.greenhouse.io/{slug}"),
+            "updated_at": job.get("updated_at"),
+        })
+
     log(f"  After PM filter: {len(pm_jobs)} role(s)")
     for job in pm_jobs:
-        log(f"    - {job['title']} | {job['location']} | {job['apply_url']}")
+        log(f"    - {job['title']} | {job['location']}")
     return pm_jobs
 
 
@@ -305,18 +323,20 @@ def main():
 
     total_new = 0
 
-    # Anthropic
-    log("[Anthropic] Checking PM roles...")
-    t0 = time.time()
-    try:
-        anthropic_jobs = get_anthropic_pm_jobs()
-        log(f"[Anthropic] {len(anthropic_jobs)} PM role(s) found ({time.time()-t0:.1f}s)")
-        new = process_company(anthropic_jobs, known, token, chat_id)
-        total_new += len(new)
-    except Exception as e:
-        log(f"[Anthropic] ERROR: {e}")
-        send_error_alert(token, chat_id, "Anthropic", e)
-    log("-" * 60)
+    # Greenhouse companies (Anthropic, OpenAI, Perplexity)
+    for company in GREENHOUSE_COMPANIES:
+        name = company["name"]
+        log(f"[{name}] Checking PM roles...")
+        t0 = time.time()
+        try:
+            jobs = get_greenhouse_pm_jobs(company)
+            log(f"[{name}] {len(jobs)} PM role(s) found ({time.time()-t0:.1f}s)")
+            new = process_company(jobs, known, token, chat_id)
+            total_new += len(new)
+        except Exception as e:
+            log(f"[{name}] ERROR: {e}")
+            send_error_alert(token, chat_id, name, e)
+        log("-" * 60)
 
     # Google
     log("[Google] Checking PM roles in India (via LinkedIn)...")
