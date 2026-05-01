@@ -26,7 +26,7 @@ GOOGLE_PM_KEYWORDS = [
 ]
 
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
+# ── Helpers ───────────────────────────────────────────────────────────────────────────────
 
 def fetch_json(url):
     req = urllib.request.Request(url, headers={"User-Agent": "pm-monitor/1.0"})
@@ -59,6 +59,20 @@ def send_telegram(token, chat_id, message):
         return json.loads(resp.read().decode())
 
 
+def send_error_alert(token, chat_id, company, error):
+    if not token or not chat_id:
+        return
+    msg = (
+        f"⚠️ <b>proj-flash error</b>\n\n"
+        f"Failed to fetch <b>{company}</b> jobs:\n"
+        f"<code>{error}</code>"
+    )
+    try:
+        send_telegram(token, chat_id, msg)
+    except Exception as alert_err:
+        print(f"  Could not send error alert: {alert_err}")
+
+
 def format_posted_date(updated_at):
     if updated_at:
         try:
@@ -80,7 +94,7 @@ def format_notification(job, total_count):
     )
 
 
-# ── Anthropic ─────────────────────────────────────────────────────────────────
+# ── Anthropic ─────────────────────────────────────────────────────────────────────────────
 
 def fetch_anthropic_jobs():
     data = fetch_json(ANTHROPIC_URL)
@@ -115,7 +129,7 @@ def get_anthropic_pm_jobs():
     return [normalize_anthropic(j) for j in all_jobs if is_anthropic_pm(j)]
 
 
-# ── Google ────────────────────────────────────────────────────────────────────
+# ── Google ───────────────────────────────────────────────────────────────────────────────
 
 def fetch_google_jobs():
     jobs = []
@@ -156,7 +170,7 @@ def get_google_pm_jobs():
     return [normalize_google(j) for j in all_jobs if is_google_pm(j)]
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# ── Main ───────────────────────────────────────────────────────────────────────────────
 
 def process_company(jobs, known, token, chat_id):
     new_jobs = [j for j in jobs if j["id"] not in known]
@@ -198,6 +212,7 @@ def main():
         process_company(anthropic_jobs, known, token, chat_id)
     except Exception as e:
         print(f"  ERROR fetching Anthropic jobs: {e}")
+        send_error_alert(token, chat_id, "Anthropic", e)
 
     # Google
     print("Checking Google PM roles in India...")
@@ -207,6 +222,7 @@ def main():
         process_company(google_jobs, known, token, chat_id)
     except Exception as e:
         print(f"  ERROR fetching Google jobs: {e}")
+        send_error_alert(token, chat_id, "Google", e)
 
     save_known_jobs(known)
     print("Done.")
