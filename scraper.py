@@ -1,5 +1,6 @@
 import json
 import os
+import time
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone, timedelta
@@ -29,6 +30,14 @@ GOOGLE_PM_KEYWORDS = [
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────────────────
+
+def now_ist():
+    return datetime.now(IST).strftime("%d %b %Y, %I:%M:%S %p IST")
+
+
+def log(msg):
+    print(f"[{now_ist()}] {msg}")
+
 
 def fetch_json(url):
     req = urllib.request.Request(url, headers={"User-Agent": "pm-monitor/1.0"})
@@ -63,6 +72,7 @@ def send_telegram(token, chat_id, message):
 
 def send_error_alert(token, chat_id, company, error):
     if not token or not chat_id:
+        log("  Telegram creds not set — skipping error alert.")
         return
     msg = (
         f"⚠️ <b>proj-flash error</b>\n\n"
@@ -71,8 +81,9 @@ def send_error_alert(token, chat_id, company, error):
     )
     try:
         send_telegram(token, chat_id, msg)
+        log("  Error alert sent to Telegram.")
     except Exception as alert_err:
-        print(f"  Could not send error alert: {alert_err}")
+        log(f"  Could not send error alert: {alert_err}")
 
 
 def format_posted_date(updated_at):
@@ -80,7 +91,6 @@ def format_posted_date(updated_at):
         try:
             dt = datetime.fromisoformat(updated_at)
             if dt.hour == 0 and dt.minute == 0 and dt.second == 0 and dt.tzinfo is None:
-                # date-only value (e.g. from jobspy) — no time component
                 return dt.strftime("%d %b %Y")
             return dt.astimezone(IST).strftime("%d %b %Y, %I:%M %p IST")
         except Exception:
@@ -131,13 +141,24 @@ def normalize_anthropic(job):
 
 
 def get_anthropic_pm_jobs():
+    t0 = time.time()
+    log(f"  Fetching from Greenhouse API: {ANTHROPIC_URL}")
     all_jobs = fetch_anthropic_jobs()
-    return [normalize_anthropic(j) for j in all_jobs if is_anthropic_pm(j)]
+    log(f"  API response: {len(all_jobs)} total jobs across all departments ({time.time()-t0:.1f}s)")
+
+    pm_jobs = [normalize_anthropic(j) for j in all_jobs if is_anthropic_pm(j)]
+    log(f"  After PM filter: {len(pm_jobs)} role(s)")
+    for job in pm_jobs:
+        log(f"    - {job['title']} | {job['location']} | {job['apply_url']}")
+    return pm_jobs
 
 
 # ── Google ───────────────────────────────────────────────────────────────────────────────
 
 def get_google_pm_jobs():
+    t0 = time.time()
+    log(f"  Source: LinkedIn | search_term='{GOOGLE_SEARCH_TERM}' | location='{GOOGLE_LOCATION}' | results_wanted={GOOGLE_RESULTS_WANTED}")
+
     try:
         df = scrape_jobs(
             site_name=["linkedin"],
@@ -149,27 +170,38 @@ def get_google_pm_jobs():
     except Exception as e:
         raise RuntimeError(f"jobspy LinkedIn scrape failed: {e}") from e
 
+    elapsed = time.time() - t0
     if df is None or df.empty:
         raise RuntimeError(
-            "jobspy returned 0 raw results from LinkedIn — possible rate-limit or API change"
+            f"jobspy returned 0 raw results from LinkedIn after {elapsed:.1f}s — possible rate-limit or API change"
         )
 
-    unique_companies = df["company"].dropna().unique().tolist()[:10]
-    print(f"  [debug] {len(df)} raw results; sample companies: {unique_companies}")
+    log(f"  Raw results: {len(df)} rows fetched in {elapsed:.1f}s")
 
+    # Company breakdown
+    company_counts = df["company"].fillna("(unknown)").value_counts()
+    log(f"  Company breakdown (top 10):")
+    for company, count in company_counts.head(10).items():
+        log(f"    {count:3d}  {company}")
+
+    # Filter step 1: company = Google
+    google_rows = df[df["company"].str.contains("google", case=False, na=False)]
+    log(f"  After company='Google' filter: {len(google_rows)} row(s)")
+    for _, row in google_rows.iterrows():
+        log(f"    title='{row.get('title')}' | location='{row.get('location')}' | posted={row.get('date_posted')}")
+
+    # Filter step 2: PM keywords
     jobs = []
-    for _, row in df.iterrows():
-        company = str(row.get("company") or "").strip()
-        if "google" not in company.lower():
-            continue
-
+    for _, row in google_rows.iterrows():
         title = str(row.get("title") or "").strip()
         if not any(kw in title.lower() for kw in GOOGLE_PM_KEYWORDS):
+            log(f"    SKIP (title not PM): '{title}'")
             continue
 
         raw_id = str(row.get("id") or "")
         stable_id = f"google_{raw_id}" if raw_id else None
         if not stable_id:
+            log(f"    SKIP (no id): '{title}'")
             continue
 
         date_posted = row.get("date_posted")
@@ -186,7 +218,7 @@ def get_google_pm_jobs():
             "updated_at": updated_at,
         })
 
-    print(f"  [debug] {len(jobs)} jobs passed Google + PM filter")
+    log(f"  After PM keyword filter: {len(jobs)} role(s) remaining")
     return jobs
 
 
@@ -194,6 +226,8 @@ def get_google_pm_jobs():
 
 def process_company(jobs, known, token, chat_id):
     new_jobs = [j for j in jobs if j["id"] not in known]
+    already_known = len(jobs) - len(new_jobs)
+    log(f"  {already_known} already known, {len(new_jobs)} new")
     now_iso = datetime.now(timezone.utc).isoformat()
 
     for job in new_jobs:
@@ -205,47 +239,70 @@ def process_company(jobs, known, token, chat_id):
         }
 
     if new_jobs:
-        print(f"  New roles: {[j['title'] for j in new_jobs]}")
+        for job in new_jobs:
+            log(f"  NEW: '{job['title']}' | {job['location']} | posted={job.get('updated_at', 'unknown')}")
+            log(f"       {job['apply_url']}")
         if token and chat_id:
             for job in new_jobs:
-                msg = format_notification(job, len(jobs))
-                send_telegram(token, chat_id, msg)
-                print(f"  Notification sent: {job['title']}")
+                try:
+                    msg = format_notification(job, len(jobs))
+                    send_telegram(token, chat_id, msg)
+                    log(f"  Telegram alert sent: '{job['title']}'")
+                except Exception as e:
+                    log(f"  Telegram alert FAILED for '{job['title']}': {e}")
         else:
-            print("  Telegram creds not set — skipping notification.")
+            log("  Telegram creds not set — skipping notifications.")
     else:
-        print("  No new roles.")
+        log("  No new roles.")
 
     return new_jobs
 
 
 def main():
+    run_start = time.time()
+    log("=" * 60)
+    log("proj-flash starting")
+
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+    log(f"Telegram configured: {'yes' if token and chat_id else 'NO — alerts disabled'}")
+
     known = load_known_jobs()
+    log(f"State: {len(known)} job(s) already in known_jobs.json")
+    log("=" * 60)
+
+    total_new = 0
 
     # Anthropic
-    print("Checking Anthropic PM roles...")
+    log("[Anthropic] Checking PM roles...")
+    t0 = time.time()
     try:
         anthropic_jobs = get_anthropic_pm_jobs()
-        print(f"  Found {len(anthropic_jobs)} PM role(s) total.")
-        process_company(anthropic_jobs, known, token, chat_id)
+        log(f"[Anthropic] {len(anthropic_jobs)} PM role(s) found ({time.time()-t0:.1f}s)")
+        new = process_company(anthropic_jobs, known, token, chat_id)
+        total_new += len(new)
     except Exception as e:
-        print(f"  ERROR fetching Anthropic jobs: {e}")
+        log(f"[Anthropic] ERROR: {e}")
         send_error_alert(token, chat_id, "Anthropic", e)
+    log("-" * 60)
 
     # Google
-    print("Checking Google PM roles in India...")
+    log("[Google] Checking PM roles in India (via LinkedIn)...")
+    t0 = time.time()
     try:
         google_jobs = get_google_pm_jobs()
-        print(f"  Found {len(google_jobs)} PM role(s) total.")
-        process_company(google_jobs, known, token, chat_id)
+        log(f"[Google] {len(google_jobs)} PM role(s) found ({time.time()-t0:.1f}s)")
+        new = process_company(google_jobs, known, token, chat_id)
+        total_new += len(new)
     except Exception as e:
-        print(f"  ERROR fetching Google jobs: {e}")
+        log(f"[Google] ERROR: {e}")
         send_error_alert(token, chat_id, "Google", e)
+    log("-" * 60)
 
     save_known_jobs(known)
-    print("Done.")
+    log(f"State saved: {len(known)} job(s) in known_jobs.json")
+    log(f"Run complete — {total_new} new role(s) found — {time.time()-run_start:.1f}s total")
+    log("=" * 60)
 
 
 if __name__ == "__main__":
