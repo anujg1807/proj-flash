@@ -4,6 +4,7 @@ import urllib.request
 import urllib.error
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from jobspy import scrape_jobs
 
 STATE_FILE = Path(__file__).parent / "known_jobs.json"
 IST = timezone(timedelta(hours=5, minutes=30))
@@ -15,11 +16,9 @@ ANTHROPIC_PM_TITLE_KEYWORDS = [
 ]
 ANTHROPIC_PM_DEPARTMENT = "product management"
 
-# --- Google Careers ---
-GOOGLE_URL = (
-    "https://careers.google.com/api/v3/search/"
-    "?company=Google&jlo=en_US&location=India&q=product+manager&sort_by=date"
-)
+# --- Google Jobs (via jobspy) ---
+GOOGLE_SEARCH_TERM = "product manager at Google India"
+GOOGLE_RESULTS_WANTED = 50
 GOOGLE_PM_KEYWORDS = [
     "product manager", "product management", "product lead",
     "group product manager", "senior product manager"
@@ -76,7 +75,11 @@ def send_error_alert(token, chat_id, company, error):
 def format_posted_date(updated_at):
     if updated_at:
         try:
-            return datetime.fromisoformat(updated_at).astimezone(IST).strftime("%d %b %Y, %I:%M %p IST")
+            dt = datetime.fromisoformat(updated_at)
+            if dt.hour == 0 and dt.minute == 0 and dt.second == 0 and dt.tzinfo is None:
+                # date-only value (e.g. from jobspy) — no time component
+                return dt.strftime("%d %b %Y")
+            return dt.astimezone(IST).strftime("%d %b %Y, %I:%M %p IST")
         except Exception:
             pass
     return datetime.now(IST).strftime("%d %b %Y, %I:%M %p IST")
@@ -131,43 +134,51 @@ def get_anthropic_pm_jobs():
 
 # ── Google ───────────────────────────────────────────────────────────────────────────────
 
-def fetch_google_jobs():
-    jobs = []
-    url = GOOGLE_URL
-    while url:
-        data = fetch_json(url)
-        jobs.extend(data.get("jobs", []))
-        next_page = data.get("next_page_token") or data.get("nextPageToken")
-        url = (GOOGLE_URL + f"&page_token={next_page}") if next_page else None
-    return jobs
-
-
-def is_google_pm(job):
-    title = job.get("title", "").lower()
-    return any(kw in title for kw in GOOGLE_PM_KEYWORDS)
-
-
-def normalize_google(job):
-    locs = job.get("locations") or job.get("location", [])
-    if isinstance(locs, list):
-        location = ", ".join(locs) if locs else "India"
-    else:
-        location = locs or "India"
-    job_id = job.get("job_id") or job.get("id", "unknown")
-    apply_url = job.get("apply_url") or job.get("absolute_url") or "https://careers.google.com"
-    return {
-        "id": f"google_{job_id}",
-        "company": "Google",
-        "title": job.get("title"),
-        "location": location,
-        "apply_url": apply_url,
-        "updated_at": job.get("date_added") or job.get("updated_at"),
-    }
-
-
 def get_google_pm_jobs():
-    all_jobs = fetch_google_jobs()
-    return [normalize_google(j) for j in all_jobs if is_google_pm(j)]
+    try:
+        df = scrape_jobs(
+            site_name=["google"],
+            google_search_term=GOOGLE_SEARCH_TERM,
+            results_wanted=GOOGLE_RESULTS_WANTED,
+            verbose=0,
+        )
+    except Exception as e:
+        raise RuntimeError(f"jobspy scrape_jobs failed: {e}") from e
+
+    if df is None or df.empty:
+        return []
+
+    jobs = []
+    for _, row in df.iterrows():
+        company = row.get("company") or ""
+        if "google" not in company.lower():
+            continue
+
+        title = row.get("title") or ""
+        if not any(kw in title.lower() for kw in GOOGLE_PM_KEYWORDS):
+            continue
+
+        raw_id = row.get("id") or ""
+        job_id = raw_id.replace("go-", "", 1) if raw_id.startswith("go-") else raw_id
+        stable_id = f"google_{job_id}" if job_id else None
+        if not stable_id:
+            continue
+
+        date_posted = row.get("date_posted")
+        updated_at = date_posted.isoformat() if date_posted else None
+        location = row.get("location") or "India"
+        apply_url = row.get("job_url") or "https://careers.google.com"
+
+        jobs.append({
+            "id": stable_id,
+            "company": "Google",
+            "title": title,
+            "location": location,
+            "apply_url": apply_url,
+            "updated_at": updated_at,
+        })
+
+    return jobs
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────────────
