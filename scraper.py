@@ -109,6 +109,18 @@ def send_error_alert(token, chat_id, company, error):
         log(f"  Could not send error alert: {alert_err}")
 
 
+def is_stale(updated_at, max_days=7):
+    if not updated_at:
+        return False
+    try:
+        dt = datetime.fromisoformat(updated_at)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - dt).days > max_days
+    except Exception:
+        return False
+
+
 def format_posted_date(updated_at):
     if updated_at:
         try:
@@ -342,6 +354,9 @@ def process_company(jobs, known, token, chat_id):
             log(f"       {job['apply_url']}")
         if token and chat_id:
             for job in new_jobs:
+                if is_stale(job.get("updated_at")):
+                    log(f"  STALE (>7d old) — skipping alert: '{job['title']}'")
+                    continue
                 try:
                     send_telegram(token, chat_id, format_notification(job, len(jobs)))
                     log(f"  Telegram alert sent: '{job['title']}'")
