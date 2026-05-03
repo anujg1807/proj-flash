@@ -135,14 +135,20 @@ def format_posted_date(updated_at):
 
 def format_notification(job, total_count):
     posted = format_posted_date(job.get("updated_at"))
-    return (
-        f"🚨 New {job['company']} PM Role\n\n"
-        f"{job['title']}\n"
-        f"📍 {job['location']}\n"
-        f"🕐 Posted: {posted}\n\n"
-        f"Apply → {job['apply_url']}\n\n"
-        f"Total {job['company']} PM roles open: {total_count}"
-    )
+    num_apps = job.get("num_applicants")
+    lines = [
+        f"🚨 New {job['company']} PM Role\n",
+        f"{job['title']}",
+        f"📍 {job['location']}",
+        f"🕐 Posted: {posted}",
+    ]
+    if num_apps:
+        lines.append(f"👥 Applicants: {num_apps}")
+    lines += [
+        f"\nApply → {job['apply_url']}\n",
+        f"Total {job['company']} PM roles open: {total_count}",
+    ]
+    return "\n".join(lines)
 
 
 def format_repost_notification(job, total_count):
