@@ -146,15 +146,23 @@ def format_notification(job, total_count):
 
 
 def format_repost_notification(job, total_count):
-    posted = format_posted_date(job.get("updated_at"))
-    return (
-        f"🔄 Reposted {job['company']} PM Role\n\n"
-        f"{job['title']}\n"
-        f"📍 {job['location']}\n"
-        f"🕐 Reposted: {posted}\n\n"
-        f"Apply → {job['apply_url']}\n\n"
-        f"Total {job['company']} PM roles open: {total_count}"
-    )
+    original = format_posted_date(job.get("original_date"))
+    reposted = format_posted_date(job.get("updated_at"))
+    num_apps = job.get("num_applicants")
+    lines = [
+        f"🔄 Reposted {job['company']} PM Role\n",
+        f"{job['title']}",
+        f"📍 {job['location']}",
+        f"🗓 Originally posted: {original}",
+        f"🔄 Reposted: {reposted}",
+    ]
+    if num_apps:
+        lines.append(f"👥 Applicants: {num_apps}")
+    lines += [
+        f"\nApply → {job['apply_url']}\n",
+        f"Total {job['company']} PM roles open: {total_count}",
+    ]
+    return "\n".join(lines)
 
 
 # ── Greenhouse (generic) ──────────────────────────────────────────────────────────────────
@@ -302,6 +310,7 @@ def get_google_pm_jobs():
         updated_at = date_posted.isoformat() if (date_posted and hasattr(date_posted, "isoformat")) else None
         location = str(row.get("location") or "India").strip()
         apply_url = str(row.get("job_url") or "https://careers.google.com").strip()
+        num_applicants = str(row.get("num_applicants") or "").strip() or None
 
         jobs.append({
             "id": stable_id,
@@ -310,6 +319,7 @@ def get_google_pm_jobs():
             "location": location,
             "apply_url": apply_url,
             "updated_at": updated_at,
+            "num_applicants": num_applicants,
         })
 
     log(f"  After PM keyword filter: {len(jobs)} role(s) remaining")
@@ -340,6 +350,7 @@ def process_company(jobs, known, token, chat_id):
             stored_date = known[job_id].get("date_posted")
             if current_date and stored_date and current_date > stored_date:
                 log(f"  REPOST detected: '{job['title']}' ({stored_date} → {current_date})")
+                job["original_date"] = stored_date
                 known[job_id]["date_posted"] = current_date
                 reposted_jobs.append(job)
             elif current_date and not stored_date:
