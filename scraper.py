@@ -493,10 +493,14 @@ def main():
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     resumes = load_resumes()
-    log(f"Fit scoring: {'enabled' if api_key and resumes else 'disabled'} "
-        f"({'no API key' if not api_key else ''}"
-        f"{'no resumes' if not resumes else ''}"
-        f"{', '.join(resumes) if resumes else ''})")
+    fit_status_parts = []
+    if not api_key:
+        fit_status_parts.append("no API key")
+    if not resumes:
+        fit_status_parts.append("no resumes")
+    if api_key and resumes:
+        fit_status_parts.append(", ".join(resumes))
+    log(f"Fit scoring: {'enabled' if api_key and resumes else 'disabled'} ({', '.join(fit_status_parts)})")
 
     known = load_known_jobs()
     log(f"State: {len(known)} job(s) already in known_jobs.json")
