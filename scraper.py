@@ -1,13 +1,14 @@
 import json
 import os
+import re
 import time
 import urllib.request
-import urllib.error
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from jobspy import scrape_jobs
 
 STATE_FILE = Path(__file__).parent / "known_jobs.json"
+RESUMES_DIR = Path(__file__).parent / "resumes"
 IST = timezone(timedelta(hours=5, minutes=30))
 
 # --- Greenhouse job boards ---
@@ -109,6 +110,64 @@ def send_error_alert(token, chat_id, company, error):
         log(f"  Could not send error alert: {alert_err}")
 
 
+def strip_html(html):
+    if not html:
+        return ""
+    return re.sub(r"<[^>]+>", " ", html).strip()
+
+
+def call_claude(api_key, prompt):
+    url = "https://api.anthropic.com/v1/messages"
+    payload = json.dumps({
+        "model": "claude-haiku-4-5-20251001",
+        "max_tokens": 256,
+        "messages": [{"role": "user", "content": prompt}],
+    }).encode()
+    req = urllib.request.Request(url, data=payload, headers={
+        "Content-Type": "application/json",
+        "x-api-key": api_key,
+        "anthropic-version": "2023-06-01",
+    })
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return json.loads(resp.read())["content"][0]["text"].strip()
+
+
+def load_resumes():
+    resumes = {}
+    if RESUMES_DIR.exists():
+        for f in sorted(RESUMES_DIR.glob("*.txt")):
+            if f.name != "README.txt":
+                resumes[f.stem] = f.read_text().strip()
+    return resumes
+
+
+def score_fit(api_key, resume_name, resume_text, job_title, jd_text):
+    prompt = (
+        f'Rate this resume\'s fit for the job. Reply with exactly one line:\n'
+        f'"Strong — <reason>" or "Good — <reason>" or "Weak — <reason>"\n'
+        f"Reason must mention domain match, seniority/years, and one key gap or strength. Max 20 words.\n\n"
+        f"Resume ({resume_name}):\n{resume_text[:3000]}\n\n"
+        f"Job: {job_title}\nDescription:\n{jd_text[:2000]}"
+    )
+    return call_claude(api_key, prompt)
+
+
+def score_best_fit(api_key, resumes, job_title, jd_text):
+    if not api_key or not resumes or not jd_text:
+        return None
+    rank = {"strong": 0, "good": 1, "weak": 2}
+    best = None
+    for name, text in resumes.items():
+        try:
+            result = score_fit(api_key, name, text, job_title, jd_text)
+            tier = result.split("—")[0].strip().lower()
+            if best is None or rank.get(tier, 9) < rank.get(best[0], 9):
+                best = (tier, name, result)
+        except Exception as e:
+            log(f"  Fit scoring failed for {name}: {e}")
+    return best  # (tier_str, resume_name, "Strong — ...")
+
+
 def is_stale(updated_at, max_days=7):
     if not updated_at:
         return False
@@ -144,6 +203,8 @@ def format_notification(job, total_count):
     ]
     if num_apps:
         lines.append(f"👥 Applicants: {num_apps}")
+    if job.get("fit"):
+        lines.append(f"🎯 Fit: {job['fit']}")
     lines += [
         f"\nApply → {job['apply_url']}\n",
         f"Total {job['company']} PM roles open: {total_count}",
@@ -164,6 +225,8 @@ def format_repost_notification(job, total_count):
     ]
     if num_apps:
         lines.append(f"👥 Applicants: {num_apps}")
+    if job.get("fit"):
+        lines.append(f"🎯 Fit: {job['fit']}")
     lines += [
         f"\nApply → {job['apply_url']}\n",
         f"Total {job['company']} PM roles open: {total_count}",
@@ -199,6 +262,12 @@ def get_greenhouse_pm_jobs(company):
 
         offices = job.get("offices", [])
         location = ", ".join(o["name"] for o in offices if o.get("name")) or "Remote / Not specified"
+        description = ""
+        try:
+            detail = fetch_json(f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs/{job['id']}")
+            description = strip_html(detail.get("content", ""))
+        except Exception:
+            pass
         pm_jobs.append({
             "id": f"{company['id_prefix']}_{job['id']}",
             "company": company["name"],
@@ -206,6 +275,7 @@ def get_greenhouse_pm_jobs(company):
             "location": location,
             "apply_url": job.get("absolute_url", f"https://boards.greenhouse.io/{slug}"),
             "updated_at": job.get("updated_at"),
+            "description": description,
         })
 
     log(f"  After PM filter: {len(pm_jobs)} role(s)")
@@ -255,6 +325,7 @@ def get_ashby_pm_jobs(company):
             continue
 
         location = _ashby_field(job.get("location")) or "Remote / Not specified"
+        description = strip_html(job.get("descriptionHtml") or job.get("description") or "")
         pm_jobs.append({
             "id": f"{company['id_prefix']}_{job['id']}",
             "company": company["name"],
@@ -262,6 +333,7 @@ def get_ashby_pm_jobs(company):
             "location": location,
             "apply_url": job.get("applyUrl", f"https://jobs.ashbyhq.com/{slug}"),
             "updated_at": job.get("publishedAt"),
+            "description": description,
         })
 
     log(f"  After PM filter: {len(pm_jobs)} role(s)")
@@ -317,6 +389,7 @@ def get_google_pm_jobs():
         location = str(row.get("location") or "India").strip()
         apply_url = str(row.get("job_url") or "https://careers.google.com").strip()
         num_applicants = str(row.get("num_applicants") or "").strip() or None
+        description = str(row.get("description") or "").strip()
 
         jobs.append({
             "id": stable_id,
@@ -326,6 +399,7 @@ def get_google_pm_jobs():
             "apply_url": apply_url,
             "updated_at": updated_at,
             "num_applicants": num_applicants,
+            "description": description,
         })
 
     log(f"  After PM keyword filter: {len(jobs)} role(s) remaining")
@@ -334,7 +408,7 @@ def get_google_pm_jobs():
 
 # ── Main ───────────────────────────────────────────────────────────────────────────────
 
-def process_company(jobs, known, token, chat_id):
+def process_company(jobs, known, token, chat_id, resumes=None, api_key=None):
     now_iso = datetime.now(timezone.utc).isoformat()
     new_jobs = []
     reposted_jobs = []
@@ -374,6 +448,10 @@ def process_company(jobs, known, token, chat_id):
                 if is_stale(job.get("updated_at")):
                     log(f"  STALE (>7d old) — skipping alert: '{job['title']}'")
                     continue
+                fit = score_best_fit(api_key, resumes, job["title"], job.get("description", ""))
+                if fit:
+                    job["fit"] = f"{fit[2]} ({fit[1]})"
+                    log(f"  Fit score: {job['fit']}")
                 try:
                     send_telegram(token, chat_id, format_notification(job, len(jobs)))
                     log(f"  Telegram alert sent: '{job['title']}'")
@@ -387,6 +465,10 @@ def process_company(jobs, known, token, chat_id):
     if reposted_jobs:
         if token and chat_id:
             for job in reposted_jobs:
+                fit = score_best_fit(api_key, resumes, job["title"], job.get("description", ""))
+                if fit:
+                    job["fit"] = f"{fit[2]} ({fit[1]})"
+                    log(f"  Fit score: {job['fit']}")
                 try:
                     send_telegram(token, chat_id, format_repost_notification(job, len(jobs)))
                     log(f"  Repost alert sent: '{job['title']}'")
@@ -409,6 +491,13 @@ def main():
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
     log(f"Telegram configured: {'yes' if token and chat_id else 'NO — alerts disabled'}")
 
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    resumes = load_resumes()
+    log(f"Fit scoring: {'enabled' if api_key and resumes else 'disabled'} "
+        f"({'no API key' if not api_key else ''}"
+        f"{'no resumes' if not resumes else ''}"
+        f"{', '.join(resumes) if resumes else ''})")
+
     known = load_known_jobs()
     log(f"State: {len(known)} job(s) already in known_jobs.json")
     log("=" * 60)
@@ -423,7 +512,7 @@ def main():
         try:
             jobs = get_greenhouse_pm_jobs(company)
             log(f"[{name}] {len(jobs)} PM role(s) found ({time.time()-t0:.1f}s)")
-            new = process_company(jobs, known, token, chat_id)
+            new = process_company(jobs, known, token, chat_id, resumes, api_key)
             total_new += len(new)
         except Exception as e:
             log(f"[{name}] ERROR: {e}")
@@ -438,7 +527,7 @@ def main():
         try:
             jobs = get_ashby_pm_jobs(company)
             log(f"[{name}] {len(jobs)} PM role(s) found ({time.time()-t0:.1f}s)")
-            new = process_company(jobs, known, token, chat_id)
+            new = process_company(jobs, known, token, chat_id, resumes, api_key)
             total_new += len(new)
         except Exception as e:
             log(f"[{name}] ERROR: {e}")
@@ -451,7 +540,7 @@ def main():
     try:
         google_jobs = get_google_pm_jobs()
         log(f"[Google] {len(google_jobs)} PM role(s) found ({time.time()-t0:.1f}s)")
-        new = process_company(google_jobs, known, token, chat_id)
+        new = process_company(google_jobs, known, token, chat_id, resumes, api_key)
         total_new += len(new)
     except Exception as e:
         log(f"[Google] ERROR: {e}")
