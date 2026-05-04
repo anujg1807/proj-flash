@@ -1,0 +1,38 @@
+Anuj Goyal
+Bengaluru, India (Open to relocation)
++919654753401 | anujgoyal010@gmail.com | linkedin.com/in/anujashokgoyal
+
+SUMMARY
+Enterprise SaaS Product Manager with 10 years of experience building and scaling B2B products for large organisations. Expertise in enterprise onboarding, admin-facing product design, and cross-functional GTM - with a focus on delivering secure, scalable solutions that IT and business stakeholders trust.
+
+WORK EXPERIENCE
+
+Product Manager, Agentforce Marketing — Salesforce | May 2024 - Present
+Enterprise SaaS with $45B ARR and 200K+ customers. Leading Day 0 Setup experience for Agentforce Marketing, Salesforce's initiative to unify B2B and B2C MarTech on the core Salesforce Platform, serving 20K+ orgs globally.
+- Reduced Time to Value (TTV) by 78% for new Agentforce Marketing customers (66 days to under 2 weeks) by conducting customer interviews to identify setup friction, then redesigning the Day 0 experience to be more guided and prescriptive while automating Data Cloud provisioning and dependency installation.
+- Generated $5M in open pipe signal for Marketing Goals, a net new product concept enabling marketers to identify, track and action upon their Business Goals, by leading end-to-end validation through 17 customer interviews and 170+ survey responses, informing a strategic prioritisation decision.
+- Scaled GTM enablement across 3,500+ customer-facing teams (Sellers, SEs, AEs, and CSMs) by authoring pre-launch solution overviews ahead of every release, enabling self-serve readiness and reducing inbound enablement queries.
+- Designed role-based permission set architecture enabling IT admins to delegate access controls across their org, reducing misconfiguration risk during enterprise onboarding.
+- Represented Agentforce Marketing at TDX Bengaluru 2025, Salesforce's developer conference and regularly presents product roadmap to enterprise customers on behalf of the org.
+
+Product Manager — ZMags | Dec 2022 - Apr 2024
+Enterprise SaaS providing a no-code website builder for E-Commerce brands like Costco, Timex, MAC Group, Toys "R" Us, Carhartt, and more.
+- Conceptualized and delivered on yearly product roadmap adding $2M in revenue by enabling the website designs and layouts to be auto-translated, updated or replaced without code change, and scheduled to go live.
+- Initiated a process to be customer-first; established Customer Advisory Board (CAB) to validate product hypothesis, seek feedback, and enroll early adopters by nurturing strong relationships with 10 key customers.
+
+Product Manager — iZooto | Oct 2019 - Dec 2022
+Enterprise SaaS MarTech providing Messaging Products (Push Notifications for web and app, Emails, On-Site Interaction) to customers like IRCTC, Aaj Tak, India Today, Times of India, Myntra, News18, and more.
+- Launched 4 messaging and retargeting products from concept to launch resulting in 75M MAU for news publishers by hosting focus groups with customers to identify key use cases; adding $4M to ARR.
+- Spearheaded the development of microservices architecture (REST API suites), increasing adoption from enterprises by 15% by scoping detailed user stories along with expected responses in JSON format.
+
+Senior Software Engineer — Infosys Ltd | Aug 2016 - Oct 2019
+Tech Stack: C#, ASP.NET, MVC, SQL, RDBMS, HTML and CSS
+
+EDUCATION
+XLRI (Xaviers School of Management) — EDP in Advanced Product Management | 2021
+Maharaja Surajmal Institute of Technology — Bachelors in Computer Applications | 2016
+
+ADDITIONAL
+- Salesforce Certified Product Owner (2024)
+- Awarded Team of the Year for setting up Solution Engineering as a function within the company (2021)
+- Guitarist & Leading Member, MixTape — Music Club of Infosys Hyderabad (2016)
