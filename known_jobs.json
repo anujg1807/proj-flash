@@ -445,7 +445,7 @@
     "location": "San Francisco",
     "apply_url": "https://jobs.ashbyhq.com/openai/f6494cf8-efbc-4dbe-ae76-662088b4f32c/application",
     "first_seen": "2026-05-04T21:11:59.062780+00:00",
-    "date_posted": "2026-05-04T19:53:08.507+00:00"
+    "date_posted": "2026-05-08T17:07:13.827+00:00"
   },
   "google_li-4395478242": {
     "title": "Senior Product Manager, Cloud Database",
@@ -474,5 +474,12 @@
     "apply_url": "https://jobs.ashbyhq.com/openai/05a8cae8-81bd-4f7b-bc48-41ef1bd67e5d/application",
     "first_seen": "2026-05-07T17:18:03.079046+00:00",
     "date_posted": "2026-05-07T17:10:35.486+00:00"
+  },
+  "google_li-4412139487": {
+    "title": "Group Product Manager, Google Play",
+    "location": "Bengaluru, Karnataka, India",
+    "apply_url": "https://www.linkedin.com/jobs/view/4412139487",
+    "first_seen": "2026-05-08T17:23:51.579981+00:00",
+    "date_posted": null
   }
 }
