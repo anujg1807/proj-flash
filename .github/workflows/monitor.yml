@@ -2,7 +2,7 @@ name: Anthropic PM Job Monitor
 
 on:
   schedule:
-    - cron: "*/30 * * * *"   # every 30 minutes
+    - cron: "0 * * * *"   # hourly fallback (primary trigger is cron-job.org via workflow_dispatch)
   workflow_dispatch:        # allow manual trigger
 
 permissions:
