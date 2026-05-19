@@ -2,6 +2,7 @@ import json
 import os
 import re
 import time
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -37,6 +38,17 @@ ASHBY_COMPANIES = [
         "id_prefix": "perplexity",
         "pm_title_keywords": ["product manager", "product management", "product lead"],
         "pm_department_keyword": None,
+    },
+]
+
+# --- Eightfold job boards ---
+EIGHTFOLD_COMPANIES = [
+    {
+        "name": "Netflix",
+        "host": "netflix.eightfold.ai",
+        "domain": "netflix.com",
+        "id_prefix": "netflix",
+        "team_filter": "Product Management",
     },
 ]
 
@@ -349,6 +361,76 @@ def get_ashby_pm_jobs(company):
     return pm_jobs
 
 
+# ── Eightfold (generic) ──────────────────────────────────────────────────────────────────
+
+def get_eightfold_pm_jobs(company):
+    host = company["host"]
+    domain = company["domain"]
+    team = company["team_filter"]
+    base_url = (
+        f"https://{host}/api/apply/v2/jobs"
+        f"?domain={domain}&Teams={urllib.parse.quote(team)}&num=10"
+    )
+    t0 = time.time()
+    log(f"  Fetching from Eightfold API (team='{team}'): https://{host}/...")
+
+    # Paginate: Eightfold caps at 10 results per request regardless of num
+    all_raw = []
+    start = 0
+    total = None
+    while True:
+        data = fetch_json(f"{base_url}&start={start}")
+        if total is None:
+            total = data.get("count", 0)
+        batch = data.get("positions", [])
+        if not batch:
+            break
+        all_raw.extend(batch)
+        start += len(batch)
+        if start >= total:
+            break
+
+    log(f"  API response: {len(all_raw)} job(s) fetched (total={total}, {time.time()-t0:.1f}s)")
+
+    pm_jobs = []
+    for job in all_raw:
+        title = (job.get("name") or "").strip()
+        job_id = str(job.get("id") or "").strip()
+        if not job_id:
+            continue
+
+        location = (job.get("location") or "Not specified").strip()
+        apply_url = job.get("canonicalPositionUrl") or f"https://{host}/careers"
+
+        updated_at = None
+        t_create = job.get("t_create")
+        if t_create:
+            try:
+                ts = int(t_create)
+                if ts > 1e10:
+                    ts /= 1000
+                updated_at = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+            except Exception:
+                pass
+
+        description = strip_html(job.get("description") or "")
+
+        pm_jobs.append({
+            "id": f"{company['id_prefix']}_{job_id}",
+            "company": company["name"],
+            "title": title,
+            "location": location,
+            "apply_url": apply_url,
+            "updated_at": updated_at,
+            "description": description,
+        })
+
+    log(f"  {len(pm_jobs)} PM role(s) found")
+    for job in pm_jobs:
+        log(f"    - {job['title']} | {job['location']}")
+    return pm_jobs
+
+
 # ── Google ───────────────────────────────────────────────────────────────────────────────
 
 def get_google_pm_jobs():
@@ -537,6 +619,21 @@ def main():
         t0 = time.time()
         try:
             jobs = get_ashby_pm_jobs(company)
+            log(f"[{name}] {len(jobs)} PM role(s) found ({time.time()-t0:.1f}s)")
+            new = process_company(jobs, known, token, chat_id, resumes, api_key)
+            total_new += len(new)
+        except Exception as e:
+            log(f"[{name}] ERROR: {e}")
+            send_error_alert(token, chat_id, name, e)
+        log("-" * 60)
+
+    # Eightfold companies (Netflix)
+    for company in EIGHTFOLD_COMPANIES:
+        name = company["name"]
+        log(f"[{name}] Checking PM roles...")
+        t0 = time.time()
+        try:
+            jobs = get_eightfold_pm_jobs(company)
             log(f"[{name}] {len(jobs)} PM role(s) found ({time.time()-t0:.1f}s)")
             new = process_company(jobs, known, token, chat_id, resumes, api_key)
             total_new += len(new)

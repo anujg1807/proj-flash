@@ -15,6 +15,7 @@ proj-flash exists to put you in that first wave, every time. It runs silently in
 | Anthropic | Greenhouse API | All PM roles (global) |
 | OpenAI | Ashby API | All PM roles (global) |
 | Perplexity | Ashby API | All PM roles (global) |
+| Netflix | Eightfold API | All PM roles (global) |
 | Google | LinkedIn via jobspy | PM roles in India |
 
 ## How it works
@@ -81,8 +82,9 @@ Go to **Actions → Anthropic PM Job Monitor → Run workflow**.
 
 - **Greenhouse ATS** (e.g. Notion, Stripe, Figma): add an entry to `GREENHOUSE_COMPANIES` in `scraper.py`
 - **Ashby ATS** (e.g. Linear, Vercel, Loom): add an entry to `ASHBY_COMPANIES` in `scraper.py`
+- **Eightfold ATS** (e.g. Netflix, Walmart, Nvidia): add an entry to `EIGHTFOLD_COMPANIES` in `scraper.py`
 
-Each entry just needs the company `name`, ATS `slug`, and a list of title keywords to filter on.
+Each entry just needs the company `name`, ATS `slug` or `host/domain`, and a list of title keywords to filter on.
 
 ### Change the job filter
 
