@@ -180,6 +180,13 @@ def is_stale(updated_at, max_days=7):
         return False
 
 
+def parse_date_posted(val):
+    """Convert a raw pandas date_posted value (date, NaT, nan, None) to ISO string or None."""
+    if val is not None and hasattr(val, "isoformat"):
+        return val.isoformat()
+    return None
+
+
 def format_posted_date(updated_at):
     if updated_at:
         try:
@@ -368,7 +375,8 @@ def get_google_pm_jobs():
 
     log(f"  Raw results: {len(df)} Google job(s) fetched in {elapsed:.1f}s")
     for _, row in df.iterrows():
-        log(f"    title='{row.get('title')}' | location='{row.get('location')}' | posted={row.get('date_posted')}")
+        parsed = parse_date_posted(row.get("date_posted"))
+        log(f"    title='{row.get('title')}' | location='{row.get('location')}' | posted={parsed or 'N/A'}")
 
     # Filter to PM titles only
     jobs = []
@@ -384,8 +392,7 @@ def get_google_pm_jobs():
             log(f"    SKIP (no id): '{title}'")
             continue
 
-        date_posted = row.get("date_posted")
-        updated_at = date_posted.isoformat() if (date_posted and hasattr(date_posted, "isoformat")) else None
+        updated_at = parse_date_posted(row.get("date_posted"))
         location = str(row.get("location") or "India").strip()
         apply_url = str(row.get("job_url") or "https://careers.google.com").strip()
         num_applicants = str(row.get("num_applicants") or "").strip() or None
