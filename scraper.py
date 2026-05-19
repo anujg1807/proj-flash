@@ -40,6 +40,17 @@ ASHBY_COMPANIES = [
     },
 ]
 
+# --- Eightfold job boards ---
+EIGHTFOLD_COMPANIES = [
+    {
+        "name": "Netflix",
+        "host": "netflix.eightfold.ai",
+        "domain": "netflix.com",
+        "id_prefix": "netflix",
+        "pm_title_keywords": ["product manager", "product management", "product lead", "group product manager"],
+    },
+]
+
 # --- Google Jobs (via LinkedIn) ---
 # Google's own search blocks GitHub Actions (Azure) IPs via bot detection.
 # Using LinkedIn with Google's company ID (1441) fetches only Google postings directly.
@@ -349,6 +360,63 @@ def get_ashby_pm_jobs(company):
     return pm_jobs
 
 
+# ── Eightfold (generic) ──────────────────────────────────────────────────────────────────
+
+def get_eightfold_pm_jobs(company):
+    host = company["host"]
+    domain = company["domain"]
+    url = f"https://{host}/api/apply/v2/jobs?domain={domain}&start=0&num=100&query=product+manager"
+    t0 = time.time()
+    log(f"  Fetching from Eightfold API: {url}")
+    data = fetch_json(url)
+
+    all_jobs = data.get("positions", [])
+    log(f"  API response: {len(all_jobs)} job(s) ({time.time()-t0:.1f}s)")
+
+    pm_title_kws = company["pm_title_keywords"]
+    pm_jobs = []
+    for job in all_jobs:
+        title = (job.get("name") or "").strip()
+        if not any(kw in title.lower() for kw in pm_title_kws):
+            continue
+
+        job_id = str(job.get("id") or "").strip()
+        if not job_id:
+            continue
+
+        location = (job.get("location") or "Not specified").strip()
+        apply_url = job.get("canonicalPositionUrl") or f"https://{host}/careers"
+
+        # t_create is a Unix timestamp; handle both seconds and milliseconds
+        updated_at = None
+        t_create = job.get("t_create")
+        if t_create:
+            try:
+                ts = int(t_create)
+                if ts > 1e10:
+                    ts /= 1000
+                updated_at = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+            except Exception:
+                pass
+
+        description = strip_html(job.get("description") or "")
+
+        pm_jobs.append({
+            "id": f"{company['id_prefix']}_{job_id}",
+            "company": company["name"],
+            "title": title,
+            "location": location,
+            "apply_url": apply_url,
+            "updated_at": updated_at,
+            "description": description,
+        })
+
+    log(f"  After PM filter: {len(pm_jobs)} role(s)")
+    for job in pm_jobs:
+        log(f"    - {job['title']} | {job['location']}")
+    return pm_jobs
+
+
 # ── Google ───────────────────────────────────────────────────────────────────────────────
 
 def get_google_pm_jobs():
@@ -537,6 +605,21 @@ def main():
         t0 = time.time()
         try:
             jobs = get_ashby_pm_jobs(company)
+            log(f"[{name}] {len(jobs)} PM role(s) found ({time.time()-t0:.1f}s)")
+            new = process_company(jobs, known, token, chat_id, resumes, api_key)
+            total_new += len(new)
+        except Exception as e:
+            log(f"[{name}] ERROR: {e}")
+            send_error_alert(token, chat_id, name, e)
+        log("-" * 60)
+
+    # Eightfold companies (Netflix)
+    for company in EIGHTFOLD_COMPANIES:
+        name = company["name"]
+        log(f"[{name}] Checking PM roles...")
+        t0 = time.time()
+        try:
+            jobs = get_eightfold_pm_jobs(company)
             log(f"[{name}] {len(jobs)} PM role(s) found ({time.time()-t0:.1f}s)")
             new = process_company(jobs, known, token, chat_id, resumes, api_key)
             total_new += len(new)
