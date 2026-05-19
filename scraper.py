@@ -2,6 +2,7 @@ import json
 import os
 import re
 import time
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -47,7 +48,7 @@ EIGHTFOLD_COMPANIES = [
         "host": "netflix.eightfold.ai",
         "domain": "netflix.com",
         "id_prefix": "netflix",
-        "pm_title_keywords": ["product manager", "product management", "product lead", "group product manager"],
+        "team_filter": "Product Management",
     },
 ]
 
@@ -365,21 +366,35 @@ def get_ashby_pm_jobs(company):
 def get_eightfold_pm_jobs(company):
     host = company["host"]
     domain = company["domain"]
-    url = f"https://{host}/api/apply/v2/jobs?domain={domain}&start=0&num=100&query=product+manager"
+    team = company["team_filter"]
+    base_url = (
+        f"https://{host}/api/apply/v2/jobs"
+        f"?domain={domain}&Teams={urllib.parse.quote(team)}&num=10"
+    )
     t0 = time.time()
-    log(f"  Fetching from Eightfold API: {url}")
-    data = fetch_json(url)
+    log(f"  Fetching from Eightfold API (team='{team}'): https://{host}/...")
 
-    all_jobs = data.get("positions", [])
-    log(f"  API response: {len(all_jobs)} job(s) ({time.time()-t0:.1f}s)")
+    # Paginate: Eightfold caps at 10 results per request regardless of num
+    all_raw = []
+    start = 0
+    total = None
+    while True:
+        data = fetch_json(f"{base_url}&start={start}")
+        if total is None:
+            total = data.get("count", 0)
+        batch = data.get("positions", [])
+        if not batch:
+            break
+        all_raw.extend(batch)
+        start += len(batch)
+        if start >= total:
+            break
 
-    pm_title_kws = company["pm_title_keywords"]
+    log(f"  API response: {len(all_raw)} job(s) fetched (total={total}, {time.time()-t0:.1f}s)")
+
     pm_jobs = []
-    for job in all_jobs:
+    for job in all_raw:
         title = (job.get("name") or "").strip()
-        if not any(kw in title.lower() for kw in pm_title_kws):
-            continue
-
         job_id = str(job.get("id") or "").strip()
         if not job_id:
             continue
@@ -387,7 +402,6 @@ def get_eightfold_pm_jobs(company):
         location = (job.get("location") or "Not specified").strip()
         apply_url = job.get("canonicalPositionUrl") or f"https://{host}/careers"
 
-        # t_create is a Unix timestamp; handle both seconds and milliseconds
         updated_at = None
         t_create = job.get("t_create")
         if t_create:
@@ -411,7 +425,7 @@ def get_eightfold_pm_jobs(company):
             "description": description,
         })
 
-    log(f"  After PM filter: {len(pm_jobs)} role(s)")
+    log(f"  {len(pm_jobs)} PM role(s) found")
     for job in pm_jobs:
         log(f"    - {job['title']} | {job['location']}")
     return pm_jobs
