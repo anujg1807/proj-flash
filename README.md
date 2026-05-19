@@ -26,6 +26,28 @@ proj-flash exists to put you in that first wave, every time. It runs silently in
 4. `known_jobs.json` is auto-committed back to the repo after each run
 5. GitHub's built-in cron runs hourly as a fallback in case cron-job.org is ever down
 
+## Architecture
+
+```mermaid
+flowchart TD
+    A["⏰ cron-job.org\nevery 30 min"] -->|POST workflow_dispatch| C
+    B["🔁 GitHub Cron\nhourly fallback"] --> C
+    C["⚙️ GitHub Actions\nmonitor.yml"] --> D["🐍 scraper.py"]
+
+    D --> E["🌿 Greenhouse API\nAnthropic"]
+    D --> F["🔶 Ashby API\nOpenAI · Perplexity"]
+    D --> G["🎬 Eightfold API\nNetflix"]
+    D --> H["🔗 LinkedIn via jobspy\nGoogle India"]
+
+    E & F & G & H --> I{"📋 Compare vs\nknown_jobs.json"}
+
+    I -->|known| J["⏭️ Skip"]
+    I -->|new| K["🎯 Score fit\nClaude API"]
+    I -->|repost| N["🔄 Repost alert\n→ Telegram"]
+    K --> L["🚨 New role alert\n→ Telegram"]
+    L & N --> M["💾 Commit updated\nknown_jobs.json"]
+```
+
 ## Notification format
 
 ```
@@ -76,6 +98,23 @@ Drop a `.txt` file in `resumes/` (see `resumes/README.txt`). The filename become
 
 Go to **Actions → Anthropic PM Job Monitor → Run workflow**.
 
+### 5. Set up cron-job.org (primary trigger)
+
+GitHub Actions' built-in cron is unreliable on free accounts — you'll get 8–15 runs/day instead of 48. cron-job.org fixes this by calling GitHub's API directly.
+
+1. Sign up at **cron-job.org** (free)
+2. Create a new job with:
+   - **URL:** `https://api.github.com/repos/YOUR_USERNAME/proj-flash/actions/workflows/monitor.yml/dispatches`
+   - **Schedule:** every 30 minutes
+   - **Method:** POST
+   - **Headers:**
+     ```
+     Authorization: Bearer YOUR_GITHUB_TOKEN
+     Accept: application/vnd.github+json
+     ```
+   - **Body (JSON):** `{"ref": "main"}`
+3. Generate a GitHub token at **Settings → Developer settings → Personal access tokens** with `repo` scope
+
 ## Customising for your needs
 
 ### Track different companies
@@ -104,19 +143,28 @@ The GitHub cron in `.github/workflows/monitor.yml` is a hourly fallback only:
 - cron: "0 * * * *"  # hourly fallback
 ```
 
-### Set up cron-job.org (primary trigger)
+## Changelog
 
-GitHub Actions' built-in cron is unreliable on free accounts — you'll get 8–15 runs/day instead of 48. cron-job.org fixes this by calling GitHub's API directly.
-
-1. Sign up at **cron-job.org** (free)
-2. Create a new job with:
-   - **URL:** `https://api.github.com/repos/YOUR_USERNAME/proj-flash/actions/workflows/monitor.yml/dispatches`
-   - **Schedule:** every 30 minutes
-   - **Method:** POST
-   - **Headers:**
-     ```
-     Authorization: Bearer YOUR_GITHUB_TOKEN
-     Accept: application/vnd.github+json
-     ```
-   - **Body (JSON):** `{"ref": "main"}`
-3. Generate a GitHub token at **Settings → Developer settings → Personal access tokens** with `repo` scope
+```
+🟣 v1.4 ── May 19, 2026
+│   🎬  Added Netflix monitoring via Eightfold API (29 PM roles tracked globally)
+│   🔧  Fixed Eightfold scraper — switched to department filter + pagination, was silently missing 19 roles
+│   ⏱️  Moved to cron-job.org as primary trigger (reliable every 30 min); GitHub cron now hourly fallback
+│
+🟣 v1.3 ── May 18, 2026
+│   🐛  Fixed raw pandas nan showing as posted date in Google job logs
+│
+🟣 v1.2 ── May 5, 2026
+│   🎯  Added resume-to-job fit scoring via Claude API — every Telegram alert now includes a fit rating
+│
+🟣 v1.1 ── May 3, 2026
+│   🤖  Added OpenAI and Perplexity monitoring via Ashby API
+│   🔄  Added repost detection — alerts when a known job is relisted with a newer date
+│   🔀  Switched Google source to LinkedIn via python-jobspy to bypass bot detection
+│   ⚡  Doubled check frequency from hourly to every 30 minutes
+│
+🟢 v1.0 ── May 1, 2026 — Initial release
+    🚀  Anthropic PM monitoring via Greenhouse API
+    📬  Telegram notifications with IST timestamps
+    💾  State persisted in known_jobs.json, auto-committed after each run
+```
