@@ -529,14 +529,14 @@
     "location": "Pune Division, Maharashtra, India",
     "apply_url": "https://www.linkedin.com/jobs/view/4415610929",
     "first_seen": "2026-05-18T12:36:30.097037+00:00",
-    "date_posted": null
+    "date_posted": "2026-05-18"
   },
   "google_li-4415608868": {
     "title": "Product Manager, Cloud Database",
     "location": "Bengaluru, Karnataka, India",
     "apply_url": "https://www.linkedin.com/jobs/view/4415608868",
     "first_seen": "2026-05-18T12:36:30.097037+00:00",
-    "date_posted": null
+    "date_posted": "2026-05-18"
   },
   "netflix_790315927614": {
     "title": "Product Manager, Ads (Targeting)",
@@ -740,5 +740,12 @@
     "apply_url": "https://explore.jobs.netflix.net/careers/job/790312452283",
     "first_seen": "2026-05-19T09:30:59.335588+00:00",
     "date_posted": "2025-10-09T00:00:00+00:00"
+  },
+  "anthropic_5220143008": {
+    "title": "Product Manager, Developer Productivity",
+    "location": "Remote / Not specified",
+    "apply_url": "https://job-boards.greenhouse.io/anthropic/jobs/5220143008",
+    "first_seen": "2026-05-19T11:01:02.159422+00:00",
+    "date_posted": "2026-05-19T06:34:22-04:00"
   }
 }
