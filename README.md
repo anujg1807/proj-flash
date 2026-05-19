@@ -19,10 +19,11 @@ proj-flash exists to put you in that first wave, every time. It runs silently in
 
 ## How it works
 
-1. GitHub Actions runs the scraper every 30 minutes
-2. New roles are compared against `known_jobs.json` (persisted state)
+1. **cron-job.org** triggers the scraper every 30 minutes via GitHub's `workflow_dispatch` API — reliably, every time
+2. GitHub Actions runs the scraper and compares new roles against `known_jobs.json` (persisted state)
 3. On a new role: scores your resume fit via Claude API, sends a Telegram notification
 4. `known_jobs.json` is auto-committed back to the repo after each run
+5. GitHub's built-in cron runs hourly as a fallback in case cron-job.org is ever down
 
 ## Notification format
 
@@ -93,8 +94,27 @@ For Google (LinkedIn search), update `GOOGLE_LOCATION` in `scraper.py`. For Gree
 
 ### Change the check frequency
 
-Edit the cron schedule in `.github/workflows/monitor.yml`:
+The primary trigger is cron-job.org (see Setup step 5). To change the frequency, update the schedule there.
+
+The GitHub cron in `.github/workflows/monitor.yml` is a hourly fallback only:
 
 ```yaml
-- cron: "*/30 * * * *"  # every 30 minutes
+- cron: "0 * * * *"  # hourly fallback
 ```
+
+### Set up cron-job.org (primary trigger)
+
+GitHub Actions' built-in cron is unreliable on free accounts — you'll get 8–15 runs/day instead of 48. cron-job.org fixes this by calling GitHub's API directly.
+
+1. Sign up at **cron-job.org** (free)
+2. Create a new job with:
+   - **URL:** `https://api.github.com/repos/YOUR_USERNAME/proj-flash/actions/workflows/monitor.yml/dispatches`
+   - **Schedule:** every 30 minutes
+   - **Method:** POST
+   - **Headers:**
+     ```
+     Authorization: Bearer YOUR_GITHUB_TOKEN
+     Accept: application/vnd.github+json
+     ```
+   - **Body (JSON):** `{"ref": "main"}`
+3. Generate a GitHub token at **Settings → Developer settings → Personal access tokens** with `repo` scope
