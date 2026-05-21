@@ -75,10 +75,26 @@ def log(msg):
     print(f"[{now_ist()}] {msg}")
 
 
-def fetch_json(url):
-    req = urllib.request.Request(url, headers={"User-Agent": "pm-monitor/1.0"})
+def fetch_json(url, extra_headers=None):
+    headers = {"User-Agent": "pm-monitor/1.0"}
+    if extra_headers:
+        headers.update(extra_headers)
+    req = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(req, timeout=15) as resp:
         return json.loads(resp.read().decode())
+
+
+EIGHTFOLD_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Referer": "https://netflix.eightfold.ai/careers",
+    "Origin": "https://netflix.eightfold.ai",
+}
 
 
 def load_known_jobs():
@@ -374,12 +390,15 @@ def get_eightfold_pm_jobs(company):
     t0 = time.time()
     log(f"  Fetching from Eightfold API (team='{team}'): https://{host}/...")
 
+    # Use browser-like headers to avoid Eightfold bot detection (403)
+    headers = {**EIGHTFOLD_HEADERS, "Referer": f"https://{host}/careers", "Origin": f"https://{host}"}
+
     # Paginate: Eightfold caps at 10 results per request regardless of num
     all_raw = []
     start = 0
     total = None
     while True:
-        data = fetch_json(f"{base_url}&start={start}")
+        data = fetch_json(f"{base_url}&start={start}", extra_headers=headers)
         if total is None:
             total = data.get("count", 0)
         batch = data.get("positions", [])
