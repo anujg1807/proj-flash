@@ -893,7 +893,7 @@
     "location": "Hyderabad, Telangana, India",
     "apply_url": "https://www.linkedin.com/jobs/view/4425255911",
     "first_seen": "2026-06-08T16:31:09.535310+00:00",
-    "date_posted": null
+    "date_posted": "2026-06-08"
   },
   "anthropic_4936029008": {
     "title": "Product Manager, Platform",
@@ -908,5 +908,12 @@
     "apply_url": "https://www.linkedin.com/jobs/view/4425844027",
     "first_seen": "2026-06-09T13:31:08.185946+00:00",
     "date_posted": null
+  },
+  "netflix_790316287334": {
+    "title": "Product Manager, Ads Platform (Experimentation Foundations)",
+    "location": "Los Angeles,California,United States of America",
+    "apply_url": "https://explore.jobs.netflix.net/careers/job/790316287334",
+    "first_seen": "2026-06-09T17:01:08.218641+00:00",
+    "date_posted": "2026-06-08T00:00:00+00:00"
   }
 }
