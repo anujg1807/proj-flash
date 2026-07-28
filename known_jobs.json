@@ -683,7 +683,7 @@
     "location": "USA - Remote",
     "apply_url": "https://explore.jobs.netflix.net/careers/job/790315424138",
     "first_seen": "2026-05-19T09:30:59.335588+00:00",
-    "date_posted": "2026-04-13T00:00:00+00:00"
+    "date_posted": "2026-04-29T00:00:00+00:00"
   },
   "netflix_790315174792": {
     "title": "Product Manager (L5), Identity and Access, Security Services Engineering",
@@ -1600,6 +1600,20 @@
     "location": "USA - Remote",
     "apply_url": "https://explore.jobs.netflix.net/careers/job/790317534842",
     "first_seen": "2026-07-28T00:30:54.484435+00:00",
+    "date_posted": "2026-07-27T00:00:00+00:00"
+  },
+  "netflix_790317534955": {
+    "title": "Product Manager - Games, Cloud Infrastructure (L5)",
+    "location": "USA - Remote",
+    "apply_url": "https://explore.jobs.netflix.net/careers/job/790317534955",
+    "first_seen": "2026-07-28T01:01:06.938500+00:00",
+    "date_posted": "2026-07-27T00:00:00+00:00"
+  },
+  "netflix_790317535096": {
+    "title": "Product Manager - Games, Kids (L5)",
+    "location": "USA - Remote",
+    "apply_url": "https://explore.jobs.netflix.net/careers/job/790317535096",
+    "first_seen": "2026-07-28T01:01:06.938500+00:00",
     "date_posted": "2026-07-27T00:00:00+00:00"
   }
 }
