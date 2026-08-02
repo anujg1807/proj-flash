@@ -17,6 +17,7 @@ proj-flash exists to put you in that first wave, every time. It runs silently in
 | Perplexity | Ashby API | All PM roles (global) |
 | Netflix | Eightfold API | All PM roles (global) |
 | Google | LinkedIn via jobspy | PM roles in India |
+| Atlassian | LinkedIn via jobspy | PM roles in India |
 
 ## How it works
 
@@ -37,7 +38,7 @@ flowchart TD
     D --> E["🌿 Greenhouse API\nAnthropic"]
     D --> F["🔶 Ashby API\nOpenAI · Perplexity"]
     D --> G["🎬 Eightfold API\nNetflix"]
-    D --> H["🔗 LinkedIn via jobspy\nGoogle India"]
+    D --> H["🔗 LinkedIn via jobspy\nGoogle · Atlassian (India)"]
 
     E & F & G & H --> I{"📋 Compare vs\nknown_jobs.json"}
 
@@ -122,6 +123,7 @@ GitHub Actions' built-in cron is unreliable on free accounts — you'll get 8–
 - **Greenhouse ATS** (e.g. Notion, Stripe, Figma): add an entry to `GREENHOUSE_COMPANIES` in `scraper.py`
 - **Ashby ATS** (e.g. Linear, Vercel, Loom): add an entry to `ASHBY_COMPANIES` in `scraper.py`
 - **Eightfold ATS** (e.g. Netflix, Walmart, Nvidia): add an entry to `EIGHTFOLD_COMPANIES` in `scraper.py`
+- **No public ATS API** (e.g. Google, Atlassian): add an entry to `LINKEDIN_COMPANIES` in `scraper.py` with the employer's numeric LinkedIn `company_id`
 
 Each entry just needs the company `name`, ATS `slug` or `host/domain`, and a list of title keywords to filter on.
 
@@ -131,7 +133,7 @@ Edit `pm_title_keywords` in each company config to match whatever roles you're h
 
 ### Change the location
 
-For Google (LinkedIn search), update `GOOGLE_LOCATION` in `scraper.py`. For Greenhouse/Ashby companies, the API returns all roles globally — filter by location inside `get_greenhouse_pm_jobs()` or `get_ashby_pm_jobs()` if needed.
+For LinkedIn-sourced companies (Google, Atlassian), update the `location` field for that entry in `LINKEDIN_COMPANIES` in `scraper.py`. For Greenhouse/Ashby companies, the API returns all roles globally — filter by location inside `get_greenhouse_pm_jobs()` or `get_ashby_pm_jobs()` if needed.
 
 ### Change the check frequency
 
