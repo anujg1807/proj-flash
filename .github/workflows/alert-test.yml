@@ -1,10 +1,15 @@
-name: Atlassian PM Alert Test (manual)
+name: PM Alert Test (manual)
 
-# One-off manual test: alerts on every open Atlassian PM role worldwide.
-# Does not touch known_jobs.json. Safe to delete once verified.
+# Manual test: alerts on every open PM role at one company, ignoring known_jobs.json.
+# Does not touch state, so it cannot suppress the real monitor. Safe to delete.
 
 on:
   workflow_dispatch:
+    inputs:
+      company:
+        description: "Company to test (Airbnb, Anthropic, Atlassian, Google, Netflix, OpenAI, Perplexity)"
+        required: true
+        default: "Airbnb"
 
 jobs:
   test:
@@ -22,9 +27,10 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Send Atlassian PM alerts (worldwide)
+      - name: Send PM alerts for ${{ inputs.company }}
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: python test_atlassian_alert.py
+          COMPANY: ${{ inputs.company }}
+        run: python test_company_alert.py
