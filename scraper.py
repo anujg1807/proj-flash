@@ -52,16 +52,35 @@ EIGHTFOLD_COMPANIES = [
     },
 ]
 
-# --- Google Jobs (via LinkedIn) ---
-# Google's own search blocks GitHub Actions (Azure) IPs via bot detection.
-# Using LinkedIn with Google's company ID (1441) fetches only Google postings directly.
-GOOGLE_LINKEDIN_COMPANY_ID = 1441
-GOOGLE_SEARCH_TERM = "product manager"
-GOOGLE_LOCATION = "India"
-GOOGLE_RESULTS_WANTED = 50
-GOOGLE_PM_KEYWORDS = [
-    "product manager", "product management", "product lead",
-    "group product manager", "senior product manager"
+# --- LinkedIn-sourced companies (via jobspy) ---
+# Career sites that block GitHub Actions (Azure) IPs via bot detection are fetched
+# through LinkedIn instead, scoped to one employer via linkedin_company_ids.
+LINKEDIN_PM_KEYWORDS = ["product manager", "product management", "product lead"]
+
+LINKEDIN_COMPANIES = [
+    {
+        "name": "Google",
+        "id_prefix": "google",
+        "company_id": 1441,
+        "search_term": "product manager",
+        "location": "India",
+        "results_wanted": 50,
+        "fallback_url": "https://careers.google.com",
+    },
+    {
+        "name": "Atlassian",
+        "id_prefix": "atlassian",
+        # Sourced from urn:li:fsd_company:22688 but NOT verified against LinkedIn
+        # directly. verify_company below guards against it being wrong — if the ID
+        # points at another employer, their rows are dropped and logged rather than
+        # mislabelled as Atlassian.
+        "company_id": 22688,
+        "verify_company": True,
+        "search_term": "Atlassian product manager",
+        "location": "India",
+        "results_wanted": 50,
+        "fallback_url": "https://www.atlassian.com/company/careers/all-jobs",
+    },
 ]
 
 
@@ -450,21 +469,28 @@ def get_eightfold_pm_jobs(company):
     return pm_jobs
 
 
-# ── Google ───────────────────────────────────────────────────────────────────────────────
+# ── LinkedIn (generic) ───────────────────────────────────────────────────────────────────
 
-def get_google_pm_jobs():
+def get_linkedin_pm_jobs(company):
+    name = company["name"]
+    company_id = company.get("company_id")
+    location = company["location"]
     t0 = time.time()
-    log(f"  Source: LinkedIn company_id={GOOGLE_LINKEDIN_COMPANY_ID} | search_term='{GOOGLE_SEARCH_TERM}' | location='{GOOGLE_LOCATION}'")
+    log(f"  Source: LinkedIn company_id={company_id or 'N/A (name match)'} | "
+        f"search_term='{company['search_term']}' | location='{location}'")
+
+    kwargs = {
+        "site_name": ["linkedin"],
+        "search_term": company["search_term"],
+        "location": location,
+        "results_wanted": company["results_wanted"],
+        "verbose": 0,
+    }
+    if company_id:
+        kwargs["linkedin_company_ids"] = [company_id]
 
     try:
-        df = scrape_jobs(
-            site_name=["linkedin"],
-            search_term=GOOGLE_SEARCH_TERM,
-            location=GOOGLE_LOCATION,
-            linkedin_company_ids=[GOOGLE_LINKEDIN_COMPANY_ID],
-            results_wanted=GOOGLE_RESULTS_WANTED,
-            verbose=0,
-        )
+        df = scrape_jobs(**kwargs)
     except Exception as e:
         raise RuntimeError(f"jobspy LinkedIn scrape failed: {e}") from e
 
@@ -474,41 +500,51 @@ def get_google_pm_jobs():
             f"jobspy returned 0 raw results from LinkedIn after {elapsed:.1f}s — possible rate-limit or API change"
         )
 
-    log(f"  Raw results: {len(df)} Google job(s) fetched in {elapsed:.1f}s")
+    employers = sorted({str(r.get("company") or "?") for _, r in df.iterrows()})
+    log(f"  Raw results: {len(df)} job(s) fetched in {elapsed:.1f}s")
+    log(f"  Employers returned: {', '.join(employers)}")
     for _, row in df.iterrows():
         parsed = parse_date_posted(row.get("date_posted"))
-        log(f"    title='{row.get('title')}' | location='{row.get('location')}' | posted={parsed or 'N/A'}")
+        log(f"    company='{row.get('company')}' | title='{row.get('title')}' | "
+            f"location='{row.get('location')}' | posted={parsed or 'N/A'}")
 
-    # Filter to PM titles only
+    # Drop rows from other employers when LinkedIn isn't scoping for us (no company_id),
+    # or when the configured company_id is unverified and we'd rather lose rows than
+    # mislabel someone else's jobs as this company's.
+    enforce_name = (not company_id) or company.get("verify_company", False)
+
     jobs = []
     for _, row in df.iterrows():
         title = str(row.get("title") or "").strip()
-        if not any(kw in title.lower() for kw in GOOGLE_PM_KEYWORDS):
+
+        if enforce_name and name.lower() not in str(row.get("company") or "").lower():
+            continue
+
+        if not any(kw in title.lower() for kw in LINKEDIN_PM_KEYWORDS):
             log(f"    SKIP (not PM title): '{title}'")
             continue
 
         raw_id = str(row.get("id") or "")
-        stable_id = f"google_{raw_id}" if raw_id else None
-        if not stable_id:
+        if not raw_id:
             log(f"    SKIP (no id): '{title}'")
             continue
 
-        updated_at = parse_date_posted(row.get("date_posted"))
-        location = str(row.get("location") or "India").strip()
-        apply_url = str(row.get("job_url") or "https://careers.google.com").strip()
-        num_applicants = str(row.get("num_applicants") or "").strip() or None
-        description = str(row.get("description") or "").strip()
-
         jobs.append({
-            "id": stable_id,
-            "company": "Google",
+            "id": f"{company['id_prefix']}_{raw_id}",
+            "company": name,
             "title": title,
-            "location": location,
-            "apply_url": apply_url,
-            "updated_at": updated_at,
-            "num_applicants": num_applicants,
-            "description": description,
+            "location": str(row.get("location") or location).strip(),
+            "apply_url": str(row.get("job_url") or company["fallback_url"]).strip(),
+            "updated_at": parse_date_posted(row.get("date_posted")),
+            "num_applicants": str(row.get("num_applicants") or "").strip() or None,
+            "description": str(row.get("description") or "").strip(),
         })
+
+    if enforce_name and company_id and not any(
+        name.lower() in e.lower() for e in employers
+    ):
+        log(f"  WARNING: company_id={company_id} returned no '{name}' rows "
+            f"(saw: {', '.join(employers)}) — the ID is likely wrong.")
 
     log(f"  After PM keyword filter: {len(jobs)} role(s) remaining")
     return jobs
@@ -661,18 +697,22 @@ def main():
             send_error_alert(token, chat_id, name, e)
         log("-" * 60)
 
-    # Google
-    log("[Google] Checking PM roles in India (via LinkedIn)...")
-    t0 = time.time()
-    try:
-        google_jobs = get_google_pm_jobs()
-        log(f"[Google] {len(google_jobs)} PM role(s) found ({time.time()-t0:.1f}s)")
-        new = process_company(google_jobs, known, token, chat_id, resumes, api_key)
-        total_new += len(new)
-    except Exception as e:
-        log(f"[Google] ERROR: {e}")
-        send_error_alert(token, chat_id, "Google", e)
-    log("-" * 60)
+    # LinkedIn-sourced companies (Google, Atlassian)
+    for i, company in enumerate(LINKEDIN_COMPANIES):
+        name = company["name"]
+        if i > 0:
+            time.sleep(5)  # space out LinkedIn scrapes to reduce rate-limit risk
+        log(f"[{name}] Checking PM roles in {company['location']} (via LinkedIn)...")
+        t0 = time.time()
+        try:
+            jobs = get_linkedin_pm_jobs(company)
+            log(f"[{name}] {len(jobs)} PM role(s) found ({time.time()-t0:.1f}s)")
+            new = process_company(jobs, known, token, chat_id, resumes, api_key)
+            total_new += len(new)
+        except Exception as e:
+            log(f"[{name}] ERROR: {e}")
+            send_error_alert(token, chat_id, name, e)
+        log("-" * 60)
 
     save_known_jobs(known)
     log(f"State saved: {len(known)} job(s) in known_jobs.json")

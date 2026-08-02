@@ -12,7 +12,13 @@ import json
 import os
 import sys
 import urllib.request
-from scraper import GREENHOUSE_COMPANIES, get_greenhouse_pm_jobs, get_google_pm_jobs, log
+from scraper import (
+    GREENHOUSE_COMPANIES,
+    LINKEDIN_COMPANIES,
+    get_greenhouse_pm_jobs,
+    get_linkedin_pm_jobs,
+    log,
+)
 
 
 def call_claude(api_key, prompt):
@@ -72,14 +78,15 @@ def main():
             log(f"  ERROR: {e}")
             all_results[name] = []
 
-    # Google (LinkedIn)
-    log("Fetching Google (via LinkedIn)...")
-    try:
-        jobs = get_google_pm_jobs()
-        all_results["Google"] = jobs
-    except Exception as e:
-        log(f"  ERROR: {e}")
-        all_results["Google"] = []
+    # LinkedIn-sourced companies (Google, Atlassian)
+    for company in LINKEDIN_COMPANIES:
+        name = company["name"]
+        log(f"Fetching {name} (via LinkedIn)...")
+        try:
+            all_results[name] = get_linkedin_pm_jobs(company)
+        except Exception as e:
+            log(f"  ERROR: {e}")
+            all_results[name] = []
 
     # Summary table
     print("\n" + "=" * 60)
