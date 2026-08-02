@@ -13,6 +13,7 @@ proj-flash exists to put you in that first wave, every time. It runs silently in
 | Company | Source | Coverage |
 |---|---|---|
 | Anthropic | Greenhouse API | All PM roles (global) |
+| Airbnb | Greenhouse API | All PM roles (global) |
 | OpenAI | Ashby API | All PM roles (global) |
 | Perplexity | Ashby API | All PM roles (global) |
 | Netflix | Eightfold API | All PM roles (global) |
@@ -35,7 +36,7 @@ flowchart TD
     B["🔁 GitHub Cron\nhourly fallback"] --> C
     C["⚙️ GitHub Actions\nmonitor.yml"] --> D["🐍 scraper.py"]
 
-    D --> E["🌿 Greenhouse API\nAnthropic"]
+    D --> E["🌿 Greenhouse API\nAnthropic · Airbnb"]
     D --> F["🔶 Ashby API\nOpenAI · Perplexity"]
     D --> G["🎬 Eightfold API\nNetflix"]
     D --> H["🔗 LinkedIn via jobspy\nGoogle · Atlassian (India)"]

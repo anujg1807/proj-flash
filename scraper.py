@@ -21,6 +21,15 @@ GREENHOUSE_COMPANIES = [
         "pm_title_keywords": ["product manager", "product management", "product lead", "research product"],
         "pm_department_keyword": "product management",
     },
+    {
+        "name": "Airbnb",
+        "slug": "airbnb",
+        "id_prefix": "airbnb",
+        "pm_title_keywords": ["product manager", "product management", "product lead"],
+        # Title-only: Airbnb's department names are unverified, and an overbroad
+        # department match is exactly what produced the OpenAI false positives.
+        "pm_department_keyword": None,
+    },
 ]
 
 # --- Ashby job boards ---
@@ -305,7 +314,9 @@ def get_greenhouse_pm_jobs(company):
     for job in all_jobs:
         title = job.get("title", "").lower()
         is_pm = any(kw in title for kw in pm_title_kws)
-        if not is_pm:
+        # Guard on pm_dept_kw: None means title-only matching (same as Ashby).
+        # Without it, `None in str` raises TypeError.
+        if not is_pm and pm_dept_kw:
             for dept in job.get("departments", []):
                 if pm_dept_kw in dept.get("name", "").lower():
                     is_pm = True
