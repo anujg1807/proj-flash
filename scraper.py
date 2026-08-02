@@ -70,7 +70,12 @@ LINKEDIN_COMPANIES = [
     {
         "name": "Atlassian",
         "id_prefix": "atlassian",
-        "company_id": None,  # set this to skip the slower name-match fallback
+        # Sourced from urn:li:fsd_company:22688 but NOT verified against LinkedIn
+        # directly. verify_company below guards against it being wrong — if the ID
+        # points at another employer, their rows are dropped and logged rather than
+        # mislabelled as Atlassian.
+        "company_id": 22688,
+        "verify_company": True,
         "search_term": "Atlassian product manager",
         "location": "India",
         "results_wanted": 50,
@@ -495,21 +500,25 @@ def get_linkedin_pm_jobs(company):
             f"jobspy returned 0 raw results from LinkedIn after {elapsed:.1f}s — possible rate-limit or API change"
         )
 
+    employers = sorted({str(r.get("company") or "?") for _, r in df.iterrows()})
     log(f"  Raw results: {len(df)} job(s) fetched in {elapsed:.1f}s")
+    log(f"  Employers returned: {', '.join(employers)}")
     for _, row in df.iterrows():
         parsed = parse_date_posted(row.get("date_posted"))
         log(f"    company='{row.get('company')}' | title='{row.get('title')}' | "
             f"location='{row.get('location')}' | posted={parsed or 'N/A'}")
 
+    # Drop rows from other employers when LinkedIn isn't scoping for us (no company_id),
+    # or when the configured company_id is unverified and we'd rather lose rows than
+    # mislabel someone else's jobs as this company's.
+    enforce_name = (not company_id) or company.get("verify_company", False)
+
     jobs = []
     for _, row in df.iterrows():
         title = str(row.get("title") or "").strip()
 
-        # Without a company_id the search spans every employer — keep only this one.
-        if not company_id:
-            row_company = str(row.get("company") or "")
-            if name.lower() not in row_company.lower():
-                continue
+        if enforce_name and name.lower() not in str(row.get("company") or "").lower():
+            continue
 
         if not any(kw in title.lower() for kw in LINKEDIN_PM_KEYWORDS):
             log(f"    SKIP (not PM title): '{title}'")
@@ -530,6 +539,12 @@ def get_linkedin_pm_jobs(company):
             "num_applicants": str(row.get("num_applicants") or "").strip() or None,
             "description": str(row.get("description") or "").strip(),
         })
+
+    if enforce_name and company_id and not any(
+        name.lower() in e.lower() for e in employers
+    ):
+        log(f"  WARNING: company_id={company_id} returned no '{name}' rows "
+            f"(saw: {', '.join(employers)}) — the ID is likely wrong.")
 
     log(f"  After PM keyword filter: {len(jobs)} role(s) remaining")
     return jobs
