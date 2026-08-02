@@ -200,7 +200,12 @@ def score_fit(api_key, resume_name, resume_text, job_title, jd_text):
 
 
 def score_best_fit(api_key, resumes, job_title, jd_text):
-    if not api_key or not resumes or not jd_text:
+    if not api_key or not resumes:
+        return None
+    if not jd_text:
+        # Loud on purpose: an empty JD silently disables scoring, which is exactly
+        # how this went unnoticed for every LinkedIn job before fetch_description.
+        log(f"  No job description available — fit scoring skipped for '{job_title}'")
         return None
     rank = {"strong": 0, "good": 1, "weak": 2}
     best = None
@@ -248,15 +253,12 @@ def format_posted_date(updated_at):
 
 def format_notification(job, total_count):
     posted = format_posted_date(job.get("updated_at"))
-    num_apps = job.get("num_applicants")
     lines = [
         f"🚨 New {job['company']} PM Role\n",
         f"{job['title']}",
         f"📍 {job['location']}",
         f"🕐 Posted: {posted}",
     ]
-    if num_apps:
-        lines.append(f"👥 Applicants: {num_apps}")
     if job.get("fit"):
         lines.append(f"🎯 Fit: {job['fit']}")
     lines += [
@@ -269,7 +271,6 @@ def format_notification(job, total_count):
 def format_repost_notification(job, total_count):
     original = format_posted_date(job.get("original_date"))
     reposted = format_posted_date(job.get("updated_at"))
-    num_apps = job.get("num_applicants")
     lines = [
         f"🔄 Reposted {job['company']} PM Role\n",
         f"{job['title']}",
@@ -277,8 +278,6 @@ def format_repost_notification(job, total_count):
         f"🗓 Originally posted: {original}",
         f"🔄 Reposted: {reposted}",
     ]
-    if num_apps:
-        lines.append(f"👥 Applicants: {num_apps}")
     if job.get("fit"):
         lines.append(f"🎯 Fit: {job['fit']}")
     lines += [
@@ -483,6 +482,9 @@ def get_linkedin_pm_jobs(company):
         "site_name": ["linkedin"],
         "search_term": company["search_term"],
         "results_wanted": company["results_wanted"],
+        # Off by default in jobspy, which leaves every description empty and so
+        # silently disables fit scoring. Costs an extra detail fetch per result.
+        "linkedin_fetch_description": company.get("fetch_description", True),
         "verbose": 0,
     }
     if location:  # omit entirely to search worldwide
@@ -504,6 +506,13 @@ def get_linkedin_pm_jobs(company):
     employers = sorted({str(r.get("company") or "?") for _, r in df.iterrows()})
     log(f"  Raw results: {len(df)} job(s) fetched in {elapsed:.1f}s")
     log(f"  Employers returned: {', '.join(employers)}")
+    if len(df) < company["results_wanted"]:
+        log(f"  Note: asked for {company['results_wanted']}, got {len(df)} — LinkedIn "
+            f"exhausted this query, so coverage is capped by its ranking, not by us")
+    missing_desc = sum(1 for _, r in df.iterrows() if not str(r.get("description") or "").strip())
+    if missing_desc:
+        log(f"  WARNING: {missing_desc}/{len(df)} row(s) have no description — "
+            f"those cannot be fit-scored")
     for _, row in df.iterrows():
         parsed = parse_date_posted(row.get("date_posted"))
         log(f"    company='{row.get('company')}' | title='{row.get('title')}' | "
@@ -537,7 +546,6 @@ def get_linkedin_pm_jobs(company):
             "location": str(row.get("location") or location or "Not specified").strip(),
             "apply_url": str(row.get("job_url") or company["fallback_url"]).strip(),
             "updated_at": parse_date_posted(row.get("date_posted")),
-            "num_applicants": str(row.get("num_applicants") or "").strip() or None,
             "description": str(row.get("description") or "").strip(),
         })
 
