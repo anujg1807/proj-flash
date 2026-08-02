@@ -474,18 +474,19 @@ def get_eightfold_pm_jobs(company):
 def get_linkedin_pm_jobs(company):
     name = company["name"]
     company_id = company.get("company_id")
-    location = company["location"]
+    location = company.get("location")
     t0 = time.time()
     log(f"  Source: LinkedIn company_id={company_id or 'N/A (name match)'} | "
-        f"search_term='{company['search_term']}' | location='{location}'")
+        f"search_term='{company['search_term']}' | location='{location or 'worldwide'}'")
 
     kwargs = {
         "site_name": ["linkedin"],
         "search_term": company["search_term"],
-        "location": location,
         "results_wanted": company["results_wanted"],
         "verbose": 0,
     }
+    if location:  # omit entirely to search worldwide
+        kwargs["location"] = location
     if company_id:
         kwargs["linkedin_company_ids"] = [company_id]
 
@@ -533,7 +534,7 @@ def get_linkedin_pm_jobs(company):
             "id": f"{company['id_prefix']}_{raw_id}",
             "company": name,
             "title": title,
-            "location": str(row.get("location") or location).strip(),
+            "location": str(row.get("location") or location or "Not specified").strip(),
             "apply_url": str(row.get("job_url") or company["fallback_url"]).strip(),
             "updated_at": parse_date_posted(row.get("date_posted")),
             "num_applicants": str(row.get("num_applicants") or "").strip() or None,
