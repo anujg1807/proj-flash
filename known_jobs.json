@@ -1726,7 +1726,7 @@
     "location": "Remote / Not specified",
     "apply_url": "https://careers.airbnb.com/positions/8091831?gh_jid=8091831",
     "first_seen": "2026-08-03T13:31:01.126829+00:00",
-    "date_posted": "2026-08-05T11:33:38-04:00"
+    "date_posted": "2026-08-05T13:32:22-04:00"
   },
   "anthropic_5251866008": {
     "title": "Product Manager, Claude Code",
@@ -1769,5 +1769,12 @@
     "apply_url": "https://www.linkedin.com/jobs/view/4449125975",
     "first_seen": "2026-08-05T17:02:34.929575+00:00",
     "date_posted": null
+  },
+  "airbnb_8104444": {
+    "title": "Product Manager, Search",
+    "location": "Remote / Not specified",
+    "apply_url": "https://careers.airbnb.com/positions/8104444?gh_jid=8104444",
+    "first_seen": "2026-08-05T18:01:14.121784+00:00",
+    "date_posted": "2026-08-05T13:39:47-04:00"
   }
 }
