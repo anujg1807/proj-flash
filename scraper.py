@@ -85,7 +85,10 @@ LINKEDIN_COMPANIES = [
         # mislabelled as Atlassian.
         "company_id": 22688,
         "verify_company": True,
-        "search_term": "Atlassian product manager",
+        # Plain "product manager" — company_id already scopes to Atlassian, so
+        # repeating the name in the query only narrows recall. Google uses the same
+        # term and returns ~50 rows where this was returning 0-2.
+        "search_term": "product manager",
         "location": "India",
         "results_wanted": 50,
         "fallback_url": "https://www.atlassian.com/company/careers/all-jobs",
@@ -510,9 +513,14 @@ def get_linkedin_pm_jobs(company):
 
     elapsed = time.time() - t0
     if df is None or df.empty:
-        raise RuntimeError(
-            f"jobspy returned 0 raw results from LinkedIn after {elapsed:.1f}s — possible rate-limit or API change"
-        )
+        # An empty result set is a legitimate outcome — a company may simply have no
+        # matching roles today. Treating it as fatal fired a Telegram alert on every
+        # run for companies with a thin pipeline. Real breakage still surfaces via the
+        # exception path above.
+        log(f"  No results from LinkedIn after {elapsed:.1f}s — treating as an empty "
+            f"result set, not a failure. (If this persists for days, the query or the "
+            f"company_id is probably wrong.)")
+        return []
 
     employers = sorted({str(r.get("company") or "?") for _, r in df.iterrows()})
     log(f"  Raw results: {len(df)} job(s) fetched in {elapsed:.1f}s")
