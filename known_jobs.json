@@ -2293,7 +2293,7 @@
     "location": "Bengaluru, Karnataka, India",
     "apply_url": "https://www.linkedin.com/jobs/view/4467626664",
     "first_seen": "2026-09-21T17:03:25.784076+00:00",
-    "date_posted": null
+    "date_posted": "2026-09-21"
   },
   "openai_83f6d415-9462-4afc-a539-ca8d996e011a": {
     "title": "Product Manager, Enterprise Identity ",
@@ -2315,5 +2315,12 @@
     "apply_url": "https://job-boards.greenhouse.io/anthropic/jobs/5400720008",
     "first_seen": "2026-09-22T00:01:43.501163+00:00",
     "date_posted": "2026-09-21T19:59:29-04:00"
+  },
+  "google_li-4469030224": {
+    "title": "Senior Product Manager, Agentic Transformation",
+    "location": "Bengaluru, Karnataka, India",
+    "apply_url": "https://www.linkedin.com/jobs/view/4469030224",
+    "first_seen": "2026-09-22T17:02:25.857385+00:00",
+    "date_posted": null
   }
 }
