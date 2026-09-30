@@ -1698,7 +1698,7 @@
     "location": "Remote / Not specified",
     "apply_url": "https://careers.airbnb.com/positions/8081925?gh_jid=8081925",
     "first_seen": "2026-08-02T20:01:05.265779+00:00",
-    "date_posted": "2026-09-24T18:49:00-04:00"
+    "date_posted": "2026-09-29T19:57:54-04:00"
   },
   "airbnb_8082161": {
     "title": "Product Manager, Tickets",
@@ -1747,7 +1747,7 @@
     "location": "Remote / Not specified",
     "apply_url": "https://careers.airbnb.com/positions/8096359?gh_jid=8096359",
     "first_seen": "2026-08-04T20:01:16.434416+00:00",
-    "date_posted": "2026-09-24T18:49:00-04:00"
+    "date_posted": "2026-09-29T19:57:54-04:00"
   },
   "netflix_790317037861": {
     "title": "Product Manager 6 - Partner Device Tools and Services",
@@ -2230,7 +2230,7 @@
     "location": "Remote / Not specified",
     "apply_url": "https://careers.airbnb.com/positions/8189782?gh_jid=8189782",
     "first_seen": "2026-09-14T19:01:09.035079+00:00",
-    "date_posted": "2026-09-24T18:49:00-04:00"
+    "date_posted": "2026-09-29T19:57:54-04:00"
   },
   "netflix_790318448253": {
     "title": "Group Product Manager, Title Launch Management",
@@ -2258,7 +2258,7 @@
     "location": "Remote / Not specified",
     "apply_url": "https://careers.airbnb.com/positions/8186787?gh_jid=8186787",
     "first_seen": "2026-09-17T20:01:15.766681+00:00",
-    "date_posted": "2026-09-24T18:49:00-04:00"
+    "date_posted": "2026-09-29T19:57:54-04:00"
   },
   "atlassian_li-4468885739": {
     "title": "Senior Product Manager",
@@ -2371,5 +2371,12 @@
     "apply_url": "https://explore.jobs.netflix.net/careers/job/790318601563",
     "first_seen": "2026-09-29T15:01:19.022090+00:00",
     "date_posted": "2026-09-22T00:00:00+00:00"
+  },
+  "netflix_790318448244": {
+    "title": "Principal Product Manager, Scaled Content Systems",
+    "location": "Remote, United States",
+    "apply_url": "https://explore.jobs.netflix.net/careers/job/790318448244",
+    "first_seen": "2026-09-30T00:01:27.531645+00:00",
+    "date_posted": "2026-09-11T00:00:00+00:00"
   }
 }
